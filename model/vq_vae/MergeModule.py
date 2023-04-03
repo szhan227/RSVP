@@ -120,9 +120,6 @@ class MergeModule(nn.Module):
         weight_l1 = self._fc_l1(torch.cat([feat_m_l1, feat_bg_l1, feat_id_l1], dim=1))
         # weight_l1 = weight_l1 + self.upsample(weight_l2)
         upl2 = self.upsample(weight_l2)
-        print('weight_l1.shape', weight_l1.shape)
-        print('weight_l2.shape', weight_l2.shape)
-        print('upl2.shape', upl2.shape)
         weight_l1 = weight_l1 + upl2
 
         weight = F.sigmoid(self._fc(weight_l1))
