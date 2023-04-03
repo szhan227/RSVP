@@ -72,6 +72,13 @@ opt = yaml.load(open('config/vqvae.yaml', 'r'), Loader=yaml.FullLoader)
 model_opt = opt['model']
 model = VQVAEModel(model_opt, opt)
 
-outputs = model(validate_inputs, is_training=False, writer=None)
-print(outputs.shape)
+
+
+bg_toks, id_toks, mo_toks = model._my_encode([ret_img, ret_img, ret_img, ret_img_mo], is_training=False)
+outputs = model._decoder(bg_toks, id_toks, mo_toks)[0]
+print('output.shape:', outputs.shape)
+
+# outputs = model(validate_inputs, is_training=False, writer=None)
+# dict_keys(['loss', 'x_rec', 'quantize_bg', 'quantize_id', 'quantize_mo', 'ssim_metric', 'rec_loss', 'lpips_loss', 'record_logs', 'optimizer_idx'])
+# print('outputs.shape:', outputs['x_rec'].shape)
 

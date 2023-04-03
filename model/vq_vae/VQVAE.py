@@ -195,6 +195,14 @@ class VQVAEModel(nn.Module):
         tokens = vq['encoding_indices'].detach()
         return tokens
 
+    def _encode_mo(self, x):
+        feat = self._encoder_mo(x)
+        feat = rearrange(feat, 'b t c h w -> (b t) c h w')
+        feat = self._pre_vq_mo(feat)
+        vq = self._vq_ema(feat, is_training=False)
+        tokens = vq['encoding_indices'].detach()
+        return tokens
+
     def _generater(self, batch, is_training):
         """
         MoCoVQVAE
@@ -270,6 +278,35 @@ class VQVAEModel(nn.Module):
                 'quant_loss_mo': vq_output_mo['loss'],
             }
         }
+
+    def _my_encode(self, batch, is_training):
+        x, xbg, xid, xmo = batch
+        B, _, _, _, _ = xbg.shape
+        feat_bg = self._encoder_bg(xbg)
+        feat_id = self._encoder_id(xid)
+        feat_mo = self._encoder_mo(xmo)
+
+        feat_bg = rearrange(feat_bg, "b t c h w -> (b t) c h w")
+        feat_id = rearrange(feat_id, "b t c h w -> (b t) c h w")
+        feat_mo = rearrange(feat_mo, "b t c h w -> (b t) c h w")
+
+        feat_bg = self._pre_vq_bg(feat_bg)
+        feat_id = self._pre_vq_id(feat_id)
+        feat_mo = self._pre_vq_mo(feat_mo)
+
+        vq_output_bg = self._vq_ema(feat_bg, is_training=is_training)
+        vq_output_id = self._vq_ema(feat_id, is_training=is_training)
+        vq_output_mo = self._vq_ema(feat_mo, is_training=is_training)
+
+        quantize_bg = self._suf_vq_bg(vq_output_bg['quantize'])
+        quantize_id = self._suf_vq_id(vq_output_id['quantize'])
+        quantize_mo = self._suf_vq_mo(vq_output_mo['quantize'])
+
+        quantize_bg = rearrange(quantize_bg, "(b t) c h w -> b t c h w", b=B)
+        quantize_id = rearrange(quantize_id, "(b t) c h w -> b t c h w", b=B)
+        quantize_mo = rearrange(quantize_mo, "(b t) c h w -> b t c h w", b=B)
+
+        return quantize_bg, quantize_id, quantize_mo
 
     def calculate_adaptive_weight(self, nll_loss, g_loss, last_layer):
         nll_grads = torch.autograd.grad(nll_loss, last_layer, retain_graph=True)[0]
