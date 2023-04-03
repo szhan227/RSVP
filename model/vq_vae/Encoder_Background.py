@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from ResidualStack import ResidualStack
+from model.vq_vae.ResidualStack import ResidualStack
 from einops import rearrange
 
 
@@ -66,7 +66,6 @@ class Encoder_Background(nn.Module):
             h = self._layers[i](xs)
             xs = F.relu(h)
         _, D, HS, WS = xs.shape
-
         # Step 2: Dimension维度Concatenation。 z=[B, D', HS, WS]
         if self._suf_method == "avg_pool":
             xs = rearrange(xs, '(b t) d hs ws -> (b hs ws) d t', b=B)

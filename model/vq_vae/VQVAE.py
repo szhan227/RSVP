@@ -1,3 +1,5 @@
+# vq_vae shared_wCD_shareCB
+
 import ipdb
 import wandb
 import torch
@@ -8,12 +10,12 @@ import numpy as np
 import argparse
 import lpips
 from einops import rearrange, repeat
-from VQ_EMA import VectorQuantizerEMA
-from Encoder_Motion import Encoder_Motion, Encoder_Motion_TA
-from Encoder_Identity import Encoder_Identity
-from Encoder_Background import Encoder_Background
-from Decoder import Decoder, Decoder_wTA
-from IMG_Discriminator import NLayerDiscriminator
+from model.vq_vae.VQ_EMA import VectorQuantizerEMA
+from model.vq_vae.Encoder_Motion import Encoder_Motion, Encoder_Motion_TA
+from model.vq_vae.Encoder_Identity import Encoder_Identity
+from model.vq_vae.Encoder_Background import Encoder_Background
+from model.vq_vae.Decoder import Decoder, Decoder_wTA
+from model.vq_vae.IMG_Discriminator import NLayerDiscriminator
 from losses.GAN_loss import hinge_d_loss
 from torchsummary import summary
 # try:

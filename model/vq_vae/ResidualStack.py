@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from Attentions import PatchwiseSelfAttention3D
-from Swin_Block import Mlp
+from model.vq_vae.Attentions import PatchwiseSelfAttention3D
+from model.vq_vae.Swin_Block import Mlp
 from einops import rearrange
 
 class ResidualStack(nn.Module):

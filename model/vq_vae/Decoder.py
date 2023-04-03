@@ -3,10 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from einops import repeat, rearrange
-from ResidualStack import ResidualStack_UP, ResidualStack
-from MergeModule import MergeModule, MergeModule_simple
-from Attentions import PatchwiseAttention
-from Attentions import MultiHeadAttention
+from model.vq_vae.ResidualStack import ResidualStack_UP, ResidualStack
+from model.vq_vae.MergeModule import MergeModule, MergeModule_simple
+from model.vq_vae.Attentions import PatchwiseAttention
+from model.vq_vae.Attentions import MultiHeadAttention
 
 class Decoder(nn.Module):
     def __init__(self, num_hiddens, num_residual_layers, num_residual_hiddens,

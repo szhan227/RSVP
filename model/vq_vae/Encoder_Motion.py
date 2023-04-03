@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from ResidualStack import ResidualStack, AttnResidualBlock
+from model.vq_vae.ResidualStack import ResidualStack, AttnResidualBlock
 from einops import rearrange
-from Attentions import MultiHeadAttention, PatchwiseSelfAttention3D
-from Swin_Block import SwinBlock
+from model.vq_vae.Attentions import MultiHeadAttention, PatchwiseSelfAttention3D
+from model.vq_vae.Swin_Block import SwinBlock
 
 class Encoder_Motion(nn.Module):
     def __init__(self, num_hiddens, num_residual_layers, num_residual_hiddens, ds_motion,

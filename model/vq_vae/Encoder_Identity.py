@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from ResidualStack import ResidualStack
+from model.vq_vae.ResidualStack import ResidualStack
 from einops import rearrange
 
 
