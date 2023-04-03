@@ -279,7 +279,7 @@ class VQVAEModel(nn.Module):
             }
         }
 
-    def _my_encode(self, batch, is_training):
+    def my_encode(self, batch, is_training):
         x, xbg, xid, xmo = batch
         B, _, _, _, _ = xbg.shape
         feat_bg = self._encoder_bg(xbg)
