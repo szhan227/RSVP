@@ -20,21 +20,31 @@ dataset:
 model:
   name: vqvae
   checkpoint_path: None
+
   num_hiddens: 128
   num_residual_layers: 2
   num_residual_hiddens: 32
-  encoder_mo_type: default
-  suf_method: conv # conv, avg_pool
-  ds_motion: 5
-  ds_identity: 5
-  ds_background: 5
-  num_head: 8
+
   embedding_dim: 64
   num_embeddings: 256
+
+  ds_content: 3
+  ds_motion: 5
+  ds_identity: 4
+  ds_background: 3
+  suf_method: conv # [avg_pool, max_pool, conv]
+  encoder_mo_type: default
+  decoder_type: default
+
+  num_head: 8
+
+
+
+
   commitment_cost: 0.25
   decay: 0.99
   if_augcb: False
-  ds_content: 5
+
   lpips_factor: 0.190
   Gen_weight: 0.5
 
