@@ -81,7 +81,7 @@ class MergeModule(nn.Module):
         self._fc = nn.Conv2d(d_model, d_model, kernel_size=1)
 
         # default: change scale_factor to 2
-        self.upsample = nn.Upsample(scale_factor=1, mode='bilinear', align_corners=True)
+        self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
 
     def forward(self, feat_bg, feat_id, feat_m):
         """
@@ -122,7 +122,7 @@ class MergeModule(nn.Module):
         upl2 = self.upsample(weight_l2)
         weight_l1 = weight_l1 + upl2
 
-        weight = F.sigmoid(self._fc(weight_l1))
+        weight = torch.sigmoid(self._fc(weight_l1))
         feat_out = weight * feat_bg_l1 + (1 - weight) * feat_id_l1
         feat_out = rearrange(feat_out, '(B T) C H W->B T C H W', T=T)
         return feat_out

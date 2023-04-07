@@ -13,7 +13,7 @@ from einops import rearrange
 from torchsummary import summary
 from omegaconf import OmegaConf
 
-from diffusionmodules import (
+from model.ldm.diffusionmodules import (
     checkpoint,
     conv_nd,
     linear,

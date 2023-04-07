@@ -302,6 +302,7 @@ class VQVAEModel(nn.Module):
         quantize_id = self._suf_vq_id(vq_output_id['quantize'])
         quantize_mo = self._suf_vq_mo(vq_output_mo['quantize'])
 
+
         quantize_bg = rearrange(quantize_bg, "(b t) c h w -> b t c h w", b=B)
         quantize_id = rearrange(quantize_id, "(b t) c h w -> b t c h w", b=B)
         quantize_mo = rearrange(quantize_mo, "(b t) c h w -> b t c h w", b=B)

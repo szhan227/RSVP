@@ -13,7 +13,7 @@ from torch.cuda.amp import GradScaler, autocast
 
 from utils import AverageMeter
 from evals.eval import test_psnr, test_ifvd, test_fvd_ddpm
-from models.ema import LitEma
+from model.ema import LitEma
 from einops import rearrange
 from torch.optim.lr_scheduler import LambdaLR
 
