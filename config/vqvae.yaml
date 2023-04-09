@@ -1,0 +1,73 @@
+
+# opt
+dataset:
+  name: UCF101
+  image_size: 64
+  batch_size: 2
+  num_workers: 1
+  pin_memory: True
+  shuffle: True
+  ret_mode: list
+  num_frames: 5
+
+  # specify train set
+  train: None
+
+  # specify validation set
+  val: None
+
+# Model config
+model:
+  name: vqvae
+  checkpoint_path: None
+
+  num_hiddens: 128
+  num_residual_layers: 2
+  num_residual_hiddens: 32
+
+  embedding_dim: 64
+  num_embeddings: 256
+
+  ds_content: 3
+  ds_motion: 5
+  ds_identity: 4
+  ds_background: 3
+  suf_method: conv # [avg_pool, max_pool, conv]
+  encoder_mo_type: default
+  decoder_type: default
+
+  num_head: 8
+
+
+
+
+  commitment_cost: 0.25
+  decay: 0.99
+  if_augcb: False
+
+  lpips_factor: 0.190
+  Gen_weight: 0.5
+
+
+  disc_opt:
+    input_nc: 3
+    ndf: 64
+    n_layers: 3
+    use_actnorm: False
+    input_formation: imgs
+# Training process config
+train:
+  #train_opt
+  local_rank: 0
+  device: cuda
+  num_training_updates: 250000
+  num_epochs: 100
+  num_warmup_steps: 100
+  num_validation_steps: 100
+  learning_rate: 2.0e-4
+  LRsche: CosineAnnealingLR
+  exp_name: None
+  save_path: None
+  disc_start_step: 50000
+  save_ckpt_per_iter: 100
+  WANDB_OPEN: None
