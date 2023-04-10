@@ -282,9 +282,18 @@ class VQVAEModel(nn.Module):
     def my_encode(self, batch, is_training):
         x, xbg, xid, xmo = batch
         B, _, _, _, _ = xbg.shape
+
+        # these three encoders will generate different shpae, now :
+        # bg: 128, 8, 8
+        # id: 128, 4, 4
+        # mo: 128, 2, 2
         feat_bg = self._encoder_bg(xbg)
         feat_id = self._encoder_id(xid)
         feat_mo = self._encoder_mo(xmo)
+
+        print('feat_bg.shape: ', feat_bg.shape)
+        print('feat_id.shape: ', feat_id.shape)
+        print('feat_mo.shape: ', feat_mo.shape)
 
         feat_bg = rearrange(feat_bg, "b t c h w -> (b t) c h w")
         feat_id = rearrange(feat_id, "b t c h w -> (b t) c h w")
@@ -303,9 +312,29 @@ class VQVAEModel(nn.Module):
         quantize_mo = self._suf_vq_mo(vq_output_mo['quantize'])
 
 
-        quantize_bg = rearrange(quantize_bg, "(b t) c h w -> b t c h w", b=B)
-        quantize_id = rearrange(quantize_id, "(b t) c h w -> b t c h w", b=B)
-        quantize_mo = rearrange(quantize_mo, "(b t) c h w -> b t c h w", b=B)
+        # quantize_bg = rearrange(quantize_bg, "(b t) c h w -> b t c h w", b=B)
+        # quantize_id = rearrange(quantize_id, "(b t) c h w -> b t c h w", b=B)
+        # quantize_mo = rearrange(quantize_mo, "(b t) c h w -> b t c h w", b=B)
+
+        # start - TODO: To combine the last 3 dimension, so as to fit PVDM ----------
+        # To rearrange to (b, t, c, h, w) before decoding
+        quantize_bg = rearrange(quantize_bg, "(b t) c h w -> b t (c h w)", b=B)
+        quantize_id = rearrange(quantize_id, "(b t) c h w -> b t (c h w)", b=B)
+        quantize_mo = rearrange(quantize_mo, "(b t) c h w -> b t (c h w)", b=B)
+
+        mo_b, mo_t, mo_lat = quantize_mo.shape
+        quantize_mo = quantize_mo.reshape((mo_b, mo_t, -1, 2048))
+
+        # also repeat time dimension of bg and id to match the time dimension of mo
+        bg_b, bg_t, bg_lat = quantize_bg.shape
+        quantize_bg = quantize_bg.reshape((bg_b, bg_t, -1, 2048))
+        quantize_bg = quantize_bg.repeat(1, mo_t, 1, 1)
+
+        id_b, id_t, id_lat = quantize_id.shape
+        quantize_id = quantize_id.reshape((id_b, id_t, -1, 2048))
+        quantize_id = quantize_id.repeat(1, mo_t, 1, 1)
+
+        # end TODO ---------------------------------------------------------
 
         return quantize_bg, quantize_id, quantize_mo
 

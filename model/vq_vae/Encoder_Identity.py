@@ -62,6 +62,7 @@ class Encoder_Identity(nn.Module):
         B, T, C, H, W = x_id.shape
         # Step 1: 降低每帧的图像分辨率。  xs=[B, T, D, H // 2**ds, W // 2**ds]
         xs = rearrange(x_id, 'b t c h w -> (b t) c h w')
+        print('for id encoder: _ds_m = ', self._ds_m)
         for i in range(self._ds_m):
             h = self._layers[i](xs)
             xs = F.relu(h)

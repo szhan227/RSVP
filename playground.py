@@ -31,7 +31,7 @@ def preprocess():
     xt = xt.permute(0, 3, 1, 2)
     print('xt.shape:', xt.shape, xt.dtype)
 
-    num_frames = 5
+    num_frames = 10
     start = 0
 
     transform = transforms.CenterCrop(64)
@@ -169,8 +169,8 @@ def play_with_PVDM_Diffuser():
     # evenly split input videos into two parts in the time dimension
     # ddpm takes in latent representations z
 
-    # output = ddpm(x=video_x, cond=None, t=timesteps)
-    # print('show output shape: ', output.shape)
+    output = ddpm(x=video_x, cond=None, t=timesteps)
+    print('show output shape: ', output.shape)
 
 
 
@@ -192,11 +192,11 @@ def play_with_all_process():
     video_x = torch.randn(5, 4, 2048).to(device)
     timesteps = torch.tensor([0, 1, 2, 3, 4]).to(device)
     unet = UNetModel(**unet_config).to(device)
-    model = DiffusionWrapper(model=unet, conditioning_key=None)
+    model = DiffusionWrapper(model=unet, conditioning_key=None).to(device)
 
     moso_opt = yaml.load(open('config/vqvae.yaml', 'r'), Loader=yaml.FullLoader)
     moso_model_opt = moso_opt['model']
-    first_stage_model = VQVAEModel(moso_model_opt, moso_opt)
+    first_stage_model = VQVAEModel(moso_model_opt, moso_opt).to(device)
 
     linear_start = 0.0015
     linear_end = 0.0195
@@ -221,7 +221,7 @@ def play_with_all_process():
     #     rootdir = logger.logdir
 
 
-    device = torch.device('cuda', rank)
+    # device = torch.device('cuda', rank)
 
     losses = dict()
     losses['diffusion_loss'] = AverageMeter()
@@ -274,6 +274,7 @@ def play_with_all_process():
             p = 0.2
 
             if p < cond_prob:
+                # split in time dimension
                 c, x = torch.chunk(x, 2, dim=2)
                 mask = (c + 1).contiguous().view(c.size(0), -1) ** 2
                 mask = torch.where(mask.sum(dim=-1) > 0, 1, 0).view(-1, 1, 1)
@@ -291,17 +292,22 @@ def play_with_all_process():
                         print('x_id.shape: ', x_id.shape)
                         print('x_mo.shape: ', x_mo.shape)
                         # bg_toks, id_toks, mo_toks = first_stage_model.my_encode([ret_img, ret_img_bg, ret_img_id, ret_img_mo], is_training=False)
+
+                        # Keep number of frames of x and c the same, now 5
                         xbg_toks, xid_toks, xmo_toks = first_stage_model.my_encode([x_img, x_bg, x_id, x_mo], is_training=False)
                         cbg_toks, cid_toks, cmo_toks = first_stage_model.my_encode([c_img, c_bg, c_id, c_mo], is_training=False)
 
-                        # print('xbg_toks.shape: ', xbg_toks.shape)
-                        # print('xid_toks.shape: ', xid_toks.shape)
-                        # print('xmo_toks.shape: ', xmo_toks.shape)
-                        # print('cbg_toks.shape: ', cbg_toks.shape)
-                        # print('cid_toks.shape: ', cid_toks.shape)
-                        # print('cmo_toks.shape: ', cmo_toks.shape)
+
+                        print('xbg_toks.shape: ', xbg_toks.shape)
+                        print('xid_toks.shape: ', xid_toks.shape)
+                        print('xmo_toks.shape: ', xmo_toks.shape)
+                        print('cbg_toks.shape: ', cbg_toks.shape)
+                        print('cid_toks.shape: ', cid_toks.shape)
+                        print('cmo_toks.shape: ', cmo_toks.shape)
                         # z = first_stage_model.module.extract(x).detach()
                         # c = first_stage_model.module.extract(c).detach()
+                        z = torch.concat([xbg_toks, xid_toks, xmo_toks], dim=-1)
+                        c = torch.concat([cbg_toks, cid_toks, cmo_toks], dim=-1)
 
 
                         c = c * mask + torch.zeros_like(c).to(c.device) * (1 - mask)
@@ -318,7 +324,8 @@ def play_with_all_process():
                     with torch.no_grad():
                         z = first_stage_model.module.extract(x).detach()
                         c = torch.zeros_like(z).to(device)
-
+            print('show z.shape: ', z.shape)
+            print('show c.shape: ', c.shape)
             (loss, t), loss_dict = criterion(z.float(), c.float())
 
         else:

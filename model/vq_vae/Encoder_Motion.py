@@ -53,7 +53,7 @@ class Encoder_Motion(nn.Module):
             h = self._layers[i](xs)
             xs = F.relu(h)
         _, D, HS, WS = xs.shape
-
+        print('for mo encoder: _ds_m = ', self._ds_m)
         # Step 2: Self-attention
         _, _, H, W = xs.shape
         z = rearrange(xs, '(B N T) C H W -> (B N H W) T C', B=B, T=self._time_head)

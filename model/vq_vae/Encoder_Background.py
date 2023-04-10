@@ -62,10 +62,12 @@ class Encoder_Background(nn.Module):
         B, T, C, H, W = x_bg.shape
         # Step 1: 降低每帧的图像分辨率。  xs=[B, T, D, H // 2**ds, W // 2**ds]
         xs = rearrange(x_bg, 'b t c h w -> (b t) c h w')
+        print('for bg encoder, _ds_m = ', self._ds_m)
         for i in range(self._ds_m):
             h = self._layers[i](xs)
             xs = F.relu(h)
         _, D, HS, WS = xs.shape
+
         # Step 2: Dimension维度Concatenation。 z=[B, D', HS, WS]
         if self._suf_method == "avg_pool":
             xs = rearrange(xs, '(b t) d hs ws -> (b hs ws) d t', b=B)

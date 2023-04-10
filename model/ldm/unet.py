@@ -841,8 +841,8 @@ class UNetModel(nn.Module):
         h_yts = []
 
 
-        if timesteps is None:
-            timesteps = torch.tensor([0, 1, 2, 3, 4]).to(x.device)
+        # if timesteps is None:
+        #     timesteps = torch.tensor([0, 1, 2, 3, 4]).to(x.device)
         t_emb = timestep_embedding(timesteps, self.model_channels, repeat_only=False)
         
         emb = self.time_embed(t_emb)
@@ -856,16 +856,25 @@ class UNetModel(nn.Module):
         if cond != None:
             h = torch.cat([h, cond], dim=1)
         elif self.cond_model:
-            print('h shape: ', h.shape)
-            print('zeros shape: ', self.zeros.repeat(h.size(0), 1, 1).shape)
+
             h = torch.cat([h, self.zeros.repeat(h.size(0), 1, 1)], dim=1)
 
+        print('h shape: ', h.shape)
+        print('zeros shape: ', self.zeros.repeat(h.size(0), 1, 1).shape)
         # TODO: treat 32 and 16 as variables
+
         h_xy = h[:, :, 0:32*32].view(h.size(0), h.size(1), 32, 32)
         h_yt = h[:, :, 32*32:32*(32+16)].view(h.size(0), h.size(1), 16, 32)
         h_xt = h[:, :, 32*(32+16):32*(32+16+16)].view(h.size(0), h.size(1), 16, 32)
-
+        # print('h_xy shape: ', h_xy.shape)
+        # print('h_yt shape: ', h_yt.shape)
+        # print('h_xt shape: ', h_xt.shape)
+        # print('input_blocks: ', len(self.input_blocks))
+        # print('input_attns : ', len(self.input_attns))
+        # print('start unet down sampling')
         for module, input_attn in zip(self.input_blocks, self.input_attns):
+            # print('\tmodule: ', module)
+            # print('\tinput_attn: ', input_attn)
             h_xy = module(h_xy, emb, context)
             h_yt = module(h_yt, emb, context)
             h_xt = module(h_xt, emb, context)
@@ -887,6 +896,10 @@ class UNetModel(nn.Module):
             h_xys.append(h_xy)
             h_yts.append(h_yt)
             h_xts.append(h_xt)
+            # print('\tappend h_xy shape: ', h_xy.shape)
+            # print('\tappend h_yt shape: ', h_yt.shape)
+            # print('\tappend h_xt shape: ', h_xt.shape)
+            # print()
 
         h_xy = self.middle_block(h_xy, emb, context)
         h_yt = self.middle_block(h_yt, emb, context)
@@ -906,7 +919,10 @@ class UNetModel(nn.Module):
         h_yt = h[:, :, res*res:res*(res+t)].view(h.size(0), h.size(1), t, res)
         h_xt = h[:, :, res*(res+t):res*(res+t+t)].view(h.size(0), h.size(1), t, res)
 
+        # print('start up sampling')
         for module, output_attn in zip(self.output_blocks, self.output_attns):
+            # print('\tmodule: ', module)
+            # print('\toutput_attn: ', output_attn)
             h_xy = th.cat([h_xy, h_xys.pop()], dim=1)
             h_xy = module(h_xy, emb, context)
             h_yt = th.cat([h_yt, h_yts.pop()], dim=1)
@@ -927,16 +943,26 @@ class UNetModel(nn.Module):
             h_xy = h[:, :, 0:res*res].view(h.size(0), h.size(1), res, res)
             h_yt = h[:, :, res*res:res*(res+t)].view(h.size(0), h.size(1), t, res)
             h_xt = h[:, :, res*(res+t):res*(res+t+t)].view(h.size(0), h.size(1), t, res)
+            # print('\tappend h_xy shape: ', h_xy.shape)
+            # print('\tappend h_yt shape: ', h_yt.shape)
+            # print('\tappend h_xt shape: ', h_xt.shape)
+            # print()
 
         h_xy = self.out(h_xy)
         h_yt = self.out(h_yt)
         h_xt = self.out(h_xt)
-
+        # print('out h_xy shape: ', h_xy.shape)
+        # print('out h_yt shape: ', h_yt.shape)
+        # print('out h_xt shape: ', h_xt.shape)
         h_xy = h_xy.view(h_xy.size(0), h_xy.size(1), -1)
         h_yt = h_yt.view(h_yt.size(0), h_yt.size(1), -1)
         h_xt = h_xt.view(h_xt.size(0), h_xt.size(1), -1)
+        # print('view out h_xy shape: ', h_xy.shape)
+        # print('view out h_yt shape: ', h_yt.shape)
+        # print('view out h_xt shape: ', h_xt.shape)
 
         h = torch.cat([h_xy, h_yt, h_xt], dim=-1)
+        # print('cat out h shape: ', h.shape)
         h = h.type(x.dtype)
 
         return h
