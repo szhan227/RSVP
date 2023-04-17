@@ -18,6 +18,9 @@ from model.vq_vae.Decoder import Decoder, Decoder_wTA
 from model.vq_vae.IMG_Discriminator import NLayerDiscriminator
 from losses.GAN_loss import hinge_d_loss
 from torchsummary import summary
+import utils
+
+logger = utils.logger
 # try:
 #     from src.losses.GAN_loss import hinge_d_loss
 # except:
@@ -49,7 +52,7 @@ class VQVAEModel(nn.Module):
         self._fixed_encoder_flag = True if self.fix_encoder else False
 
         time_head = model_opt.get('time_head', opt['dataset']['num_frames'])
-        print(f"!!!!!!!!!!! time head: {time_head} !!!!!!!!!!!!!")
+        logger.debug(f"!!!!!!!!!!! time head: {time_head} !!!!!!!!!!!!!")
 
         # discriminator
         self._disc_start_step = opt['train']['disc_start_step']
@@ -65,11 +68,18 @@ class VQVAEModel(nn.Module):
         self.abs_weight = model_opt.get('ABS_weight', 0)
         self.mse_weight = model_opt.get('MSR_weight', 0)
         self.ssim_weight = model_opt.get('SSIM_weight', 0)
-        print(f'!!! ABS_weight: {self.abs_weight}')
-        print(f'!!! MSE_weight: {self.mse_weight}')
-        print(f'!!! SSIM_weight: {self.ssim_weight}')
+        logger.debug(f'!!! ABS_weight: {self.abs_weight}')
+        logger.debug(f'!!! MSE_weight: {self.mse_weight}')
+        logger.debug(f'!!! SSIM_weight: {self.ssim_weight}')
 
         # Construct model
+        logger.debug('contructing model...')
+        logger.debug('ds_background: ', ds_background)
+        logger.debug('num_hiddens: ', num_hiddens)
+        logger.debug('num_residual_layers: ', num_residual_layers)
+        logger.debug('num_residual_hiddens: ', num_residual_hiddens)
+        logger.debug('suf_method: ', suf_method)
+        logger.debug('n_frames: ', num_frames)
         self._encoder_bg = Encoder_Background(ds_content=ds_background,
                                               num_hiddens=num_hiddens,
                                               num_residual_layers=num_residual_layers,
@@ -83,7 +93,7 @@ class VQVAEModel(nn.Module):
                                             T=num_frames, suf_method=suf_method)
 
         if model_opt['encoder_mo_type'] is None or model_opt['encoder_mo_type'] == 'default':
-            print(f"Loading Motion Encoder: Encoder_Motion...")
+            logger.debug(f"Loading Motion Encoder: Encoder_Motion...")
             self._encoder_mo = Encoder_Motion(ds_motion=ds_motion,
                                               num_hiddens=num_hiddens,
                                               num_residual_layers=num_residual_layers,
@@ -91,7 +101,7 @@ class VQVAEModel(nn.Module):
                                               n_head=num_head, d_model=num_hiddens, d_kv=64,
                                               time_head=time_head)
         elif model_opt['encoder_mo_type'].lower() == 'time-agnostic':
-            print(f"Loading Motion Encoder: Encoder_Motion_TA...")
+            logger.debug(f"Loading Motion Encoder: Encoder_Motion_TA...")
             self._encoder_mo = Encoder_Motion_TA(ds_motion=ds_motion,
                                                  num_hiddens=num_hiddens,
                                                  num_residual_layers=num_residual_layers,
@@ -141,7 +151,7 @@ class VQVAEModel(nn.Module):
         self._data_variance = 0.0632704
 
         if self.fix_encoder:
-            print("!!!!!!WARNING!!!!!!: FIX Encoder!!!")
+            logger.debug("!!!!!!WARNING!!!!!!: FIX Encoder!!!")
             self._fix_encoder()
 
     def _fix_encoder(self):
@@ -216,6 +226,10 @@ class VQVAEModel(nn.Module):
         feat_id = self._encoder_id(xid)
         feat_mo = self._encoder_mo(xmo)
 
+        logger.debug('after encoder feat_bg', feat_bg.shape, feat_bg.dtype)
+        logger.debug('after encoder feat_id', feat_id.shape, feat_id.dtype)
+        logger.debug('after encoder feat_mo', feat_mo.shape, feat_mo.dtype)
+
         feat_bg = rearrange(feat_bg, "b t c h w -> (b t) c h w")
         feat_id = rearrange(feat_id, "b t c h w -> (b t) c h w")
         feat_mo = rearrange(feat_mo, "b t c h w -> (b t) c h w")
@@ -224,9 +238,25 @@ class VQVAEModel(nn.Module):
         feat_id = self._pre_vq_id(feat_id)
         feat_mo = self._pre_vq_mo(feat_mo)
 
+        logger.debug('after pre_vq feat_bg', feat_bg.shape, feat_bg.dtype)
+        logger.debug('after pre_vq feat_id', feat_id.shape, feat_id.dtype)
+        logger.debug('after pre_vq feat_mo', feat_mo.shape, feat_mo.dtype)
+
         vq_output_bg = self._vq_ema(feat_bg, is_training=is_training)
         vq_output_id = self._vq_ema(feat_id, is_training=is_training)
         vq_output_mo = self._vq_ema(feat_mo, is_training=is_training)
+
+        # logger.debug('vq_output_bg')
+        # for key in vq_output_bg:
+        #     logger.debug(key, vq_output_bg[key].shape, vq_output_bg[key].dtype)
+        #
+        # logger.debug('vq_output_id')
+        # for key in vq_output_id:
+        #     logger.debug(key, vq_output_id[key].shape, vq_output_id[key].dtype)
+        #
+        # logger.debug('vq_output_mo')
+        # for key in vq_output_mo:
+        #     logger.debug(key, vq_output_mo[key].shape, vq_output_mo[key].dtype)
 
         quantize_bg = self._suf_vq_bg(vq_output_bg['quantize'])
         quantize_id = self._suf_vq_id(vq_output_id['quantize'])
@@ -245,6 +275,9 @@ class VQVAEModel(nn.Module):
         # SSIM loss
         tx = rearrange(x, 'b t c h w -> (b t) c h w')
         tx_rec = rearrange(x_rec, 'b t c h w -> (b t) c h w')
+
+        #change tx_rec dtype to match tx
+        tx_rec = tx_rec.type(tx.dtype)
         ssim_val = ssim(tx, tx_rec, data_range=1, size_average=True)
         recon_loss = recon_loss - ssim_val * self.ssim_weight
 
@@ -291,9 +324,9 @@ class VQVAEModel(nn.Module):
         feat_id = self._encoder_id(xid)
         feat_mo = self._encoder_mo(xmo)
 
-        print('feat_bg.shape: ', feat_bg.shape)
-        print('feat_id.shape: ', feat_id.shape)
-        print('feat_mo.shape: ', feat_mo.shape)
+        logger.debug('feat_bg.shape: ', feat_bg.shape)
+        logger.debug('feat_id.shape: ', feat_id.shape)
+        logger.debug('feat_mo.shape: ', feat_mo.shape)
 
         feat_bg = rearrange(feat_bg, "b t c h w -> (b t) c h w")
         feat_id = rearrange(feat_id, "b t c h w -> (b t) c h w")
@@ -307,36 +340,87 @@ class VQVAEModel(nn.Module):
         vq_output_id = self._vq_ema(feat_id, is_training=is_training)
         vq_output_mo = self._vq_ema(feat_mo, is_training=is_training)
 
+        logger.debug('vq_output_bg:')
+        for key in vq_output_bg:
+            logger.debug(key, vq_output_bg[key].shape, vq_output_bg[key].dtype)
+        logger.debug('vq_output_id:')
+        for key in vq_output_id:
+            logger.debug(key, vq_output_id[key].shape, vq_output_id[key].dtype)
+        logger.debug('vq_output_mo:')
+        for key in vq_output_mo:
+            logger.debug(key, vq_output_mo[key].shape, vq_output_mo[key].dtype)
+
         quantize_bg = self._suf_vq_bg(vq_output_bg['quantize'])
         quantize_id = self._suf_vq_id(vq_output_id['quantize'])
         quantize_mo = self._suf_vq_mo(vq_output_mo['quantize'])
 
 
-        # quantize_bg = rearrange(quantize_bg, "(b t) c h w -> b t c h w", b=B)
-        # quantize_id = rearrange(quantize_id, "(b t) c h w -> b t c h w", b=B)
-        # quantize_mo = rearrange(quantize_mo, "(b t) c h w -> b t c h w", b=B)
+        # original code when used for testing
+
+        quantize_bg = rearrange(quantize_bg, "(b t) c h w -> b t c h w", b=B)
+        quantize_id = rearrange(quantize_id, "(b t) c h w -> b t c h w", b=B)
+        quantize_mo = rearrange(quantize_mo, "(b t) c h w -> b t c h w", b=B)
 
         # start - TODO: To combine the last 3 dimension, so as to fit PVDM ----------
         # To rearrange to (b, t, c, h, w) before decoding
-        quantize_bg = rearrange(quantize_bg, "(b t) c h w -> b t (c h w)", b=B)
-        quantize_id = rearrange(quantize_id, "(b t) c h w -> b t (c h w)", b=B)
-        quantize_mo = rearrange(quantize_mo, "(b t) c h w -> b t (c h w)", b=B)
+        # quantize_bg = rearrange(quantize_bg, "(b t) c h w -> b t (c h w)", b=B)
+        # quantize_id = rearrange(quantize_id, "(b t) c h w -> b t (c h w)", b=B)
+        # quantize_mo = rearrange(quantize_mo, "(b t) c h w -> b t (c h w)", b=B)
 
-        mo_b, mo_t, mo_lat = quantize_mo.shape
-        quantize_mo = quantize_mo.reshape((mo_b, mo_t, -1, 2048))
+        logger.debug('quantize_bg.shape: ', quantize_bg.shape)
+        logger.debug('quantize_id.shape: ', quantize_id.shape)
+        logger.debug('quantize_mo.shape: ', quantize_mo.shape)
 
-        # also repeat time dimension of bg and id to match the time dimension of mo
-        bg_b, bg_t, bg_lat = quantize_bg.shape
-        quantize_bg = quantize_bg.reshape((bg_b, bg_t, -1, 2048))
-        quantize_bg = quantize_bg.repeat(1, mo_t, 1, 1)
-
-        id_b, id_t, id_lat = quantize_id.shape
-        quantize_id = quantize_id.reshape((id_b, id_t, -1, 2048))
-        quantize_id = quantize_id.repeat(1, mo_t, 1, 1)
+        # mo_b, mo_t, mo_lat = quantize_mo.shape
+        # quantize_mo = quantize_mo.reshape((mo_b, mo_t, -1, 2048))
+        #
+        # # also repeat time dimension of bg and id to match the time dimension of mo
+        # bg_b, bg_t, bg_lat = quantize_bg.shape
+        # quantize_bg = quantize_bg.reshape((bg_b, bg_t, -1, 2048))
+        # quantize_bg = quantize_bg.repeat(1, mo_t, 1, 1)
+        #
+        # id_b, id_t, id_lat = quantize_id.shape
+        # quantize_id = quantize_id.reshape((id_b, id_t, -1, 2048))
+        # quantize_id = quantize_id.repeat(1, mo_t, 1, 1)
 
         # end TODO ---------------------------------------------------------
 
         return quantize_bg, quantize_id, quantize_mo
+
+
+    def extract_tokens(self, batch, is_training):
+        x, xbg, xid, xmo = batch
+        B, _, _, _, _ = xbg.shape
+
+        # these three encoders will generate different shpae, now :
+        # bg: 128, 8, 8
+        # id: 128, 4, 4
+        # mo: 128, 2, 2
+        feat_bg = self._encoder_bg(xbg)
+        feat_id = self._encoder_id(xid)
+        feat_mo = self._encoder_mo(xmo)
+
+        logger.debug('feat_bg.shape: ', feat_bg.shape)
+        logger.debug('feat_id.shape: ', feat_id.shape)
+        logger.debug('feat_mo.shape: ', feat_mo.shape)
+
+        feat_bg = rearrange(feat_bg, "b t c h w -> (b t) c h w")
+        feat_id = rearrange(feat_id, "b t c h w -> (b t) c h w")
+        feat_mo = rearrange(feat_mo, "b t c h w -> (b t) c h w")
+
+        feat_bg = self._pre_vq_bg(feat_bg)
+        feat_id = self._pre_vq_id(feat_id)
+        feat_mo = self._pre_vq_mo(feat_mo)
+
+        vq_output_bg = self._vq_ema(feat_bg, is_training=is_training)
+        vq_output_id = self._vq_ema(feat_id, is_training=is_training)
+        vq_output_mo = self._vq_ema(feat_mo, is_training=is_training)
+
+        bg_tokens = vq_output_bg['encoding_indices']
+        id_tokens = vq_output_id['encoding_indices']
+        mo_tokens = vq_output_mo['encoding_indices']
+
+        return bg_tokens, id_tokens, mo_tokens
 
     def calculate_adaptive_weight(self, nll_loss, g_loss, last_layer):
         nll_grads = torch.autograd.grad(nll_loss, last_layer, retain_graph=True)[0]
@@ -449,7 +533,7 @@ class VQVAEModel(nn.Module):
 
 def printkey(keys):
     for item in keys:
-        print(item)
+        logger.debug(item)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="VQVAE2")
@@ -465,7 +549,7 @@ if __name__ == '__main__':
 
     # input = torch.randn([32, 3, 256, 256])
     # flops, params = profile(model, inputs=(input,))
-    # print(flops)
-    # print(params)
+    # logger.debug(flops)
+    # logger.debug(params)
 
     # params = torch.sum

@@ -9,12 +9,14 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 import gdown
+import time
 
 
 class Logger(object):
     """Reference: https://gist.github.com/gyglim/1f8dfb1b5c82627ae3efcfbbadb9f514"""
 
-    def __init__(self, fn, ask=True):
+    def __init__(self, fn, ask=True, level='debug'):
+        self.level = level
         if not os.path.exists("./results/"):
             os.mkdir("./results/")
 
@@ -26,6 +28,8 @@ class Logger(object):
             exit(1)
 
         self.set_dir(logdir)
+
+        self.levels = {'debug': 0, 'info': 1, 'warning': 2, 'error': 3, 'critical': 4}
 
     def _make_dir(self, fn):
         # today = datetime.today().strftime("%y%m%d")
@@ -39,12 +43,33 @@ class Logger(object):
         self.writer = SummaryWriter(logdir)
         self.log_file = open(os.path.join(logdir, log_fn), 'a')
 
-    def log(self, string):
-        self.log_file.write('[%s] %s' % (datetime.now(), string) + '\n')
+    def log(self, *args):
+        # self.log_file.write('[%s] %s' % (datetime.now(), string) + '\n')
+        self.log_file.write(' '.join([str(arg) for arg in args]) + '\n')
         self.log_file.flush()
-
-        print('[%s] %s' % (datetime.now(), string))
+        # print('[%s] %s' % (datetime.now(), string))
+        print(datetime.now(), *args)
         sys.stdout.flush()
+
+    def debug(self, *args):
+        if self.levels[self.level] <= self.levels['debug']:
+            self.log(*args)
+
+    def info(self, *args):
+        if self.levels[self.level] <= self.levels['info']:
+            self.log(*args)
+
+    def warning(self, *args):
+        if self.levels[self.level] <= self.levels['warning']:
+            self.log(*args)
+
+    def error(self, *args):
+        if self.levels[self.level] <= self.levels['error']:
+            self.log(*args)
+
+    def critical(self, *args):
+        if self.levels[self.level] <= self.levels['critical']:
+            self.log(*args)
 
     def log_dirname(self, string):
         self.log_file.write('%s (%s)' % (string, self.logdir) + '\n')
@@ -179,3 +204,9 @@ def make_mixed_pairs(l, t1, t2, given_vid_real, given_vid_fake):
     dt = ret_t2 - ret_t1
 
     return torch.cat([ret_frame1, ret_frame2, dt], dim=1)
+
+
+global logger
+msg_level = 'info'
+logger = Logger(f'log_{msg_level}_{time.time()}', level=msg_level)
+

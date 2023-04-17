@@ -12,6 +12,7 @@ import torch.nn.functional as F
 from einops import rearrange
 from torchsummary import summary
 from omegaconf import OmegaConf
+import utils
 
 from model.ldm.diffusionmodules import (
     checkpoint,
@@ -23,6 +24,7 @@ from model.ldm.diffusionmodules import (
     timestep_embedding,
 )
 
+logger = utils.logger
 class DiffusionWrapper(nn.Module):
     def __init__(self, model, conditioning_key=None):
         super().__init__()
@@ -512,6 +514,7 @@ class UNetModel(nn.Module):
         out_channels,
         num_res_blocks,
         attention_resolutions,
+        # num_frames,
         dropout=0,
         channel_mult=(1, 2, 4, 8),
         conv_resample=True,
@@ -568,6 +571,7 @@ class UNetModel(nn.Module):
         self.num_heads_upsample = num_heads_upsample
         self.predict_codebook_ids = n_embed is not None
         self.cond_model = cond_model
+        # self.num_frames = num_frames
         if cond_model:
             self.register_buffer("zeros", torch.zeros(1, self.in_channels, 2048))
 
@@ -582,11 +586,13 @@ class UNetModel(nn.Module):
         if self.num_classes is not None:
             self.label_emb = nn.Embedding(num_classes, time_embed_dim)
 
+        # TODO: try to change in_channels to num_frames
         if cond_model:
             self.input_blocks = nn.ModuleList(
                 [
                     TimestepEmbedSequential(
                         conv_nd(dims, in_channels*2, model_channels, 3, padding=1)
+                        # conv_nd(dims, num_frames*2, model_channels, 3, padding=1)
                     )
                 ]
             )
@@ -595,16 +601,33 @@ class UNetModel(nn.Module):
                 [
                     TimestepEmbedSequential(
                         conv_nd(dims, in_channels, model_channels, 3, padding=1)
+                        # conv_nd(dims, num_frames, model_channels, 3, padding=1)
                     )
                 ]
             )
+
+        # # TODO: input_static_blocks, the convolutional layers that handle background and object latents
+        # self.input_static_blocks = nn.ModuleList(
+        #     [
+        #         TimestepEmbedSequential(
+        #             conv_nd(dims, 2 if cond_model else 1, model_channels, 3, padding=1)
+        #         )
+        #     ]
+        # )
+        # # TODO END
 
         self.input_attns = nn.ModuleList([nn.Identity()])
         self._feature_size = model_channels
         input_block_chans = [model_channels]
         ch = model_channels
         ds = 1
+
+        # in our case, mult: 1, 2, 4, 4
+        logger.debug('before loop:')
+        logger.debug('num of input blocks:', len(self.input_blocks))
+        logger.debug('num of input attns:', len(self.input_attns))
         for level, mult in enumerate(channel_mult):
+            # logger.debug('in level:', level, 'mult:', mult)
             for _ in range(num_res_blocks):
                 layers = [
                     ResBlock(
@@ -618,6 +641,7 @@ class UNetModel(nn.Module):
                     )
                 ]
                 ch = mult * model_channels
+                # logger.debug('model channels:', ch)
                 if ds in attention_resolutions:
                     if num_head_channels == -1:
                         dim_head = ch // num_heads
@@ -639,6 +663,7 @@ class UNetModel(nn.Module):
                         )
                     )
                 self.input_blocks.append(TimestepEmbedSequential(*layers))
+                # self.input_static_blocks.append(TimestepEmbedSequential(*layers))
                 self._feature_size += ch
                 input_block_chans.append(ch)
 
@@ -672,6 +697,26 @@ class UNetModel(nn.Module):
                         )
                     )
                 )
+                #
+                # self.input_static_blocks.append(
+                #     TimestepEmbedSequential(
+                #         ResBlock(
+                #             ch,
+                #             time_embed_dim,
+                #             dropout,
+                #             out_channels=out_ch,
+                #             dims=dims,
+                #             use_checkpoint=use_checkpoint,
+                #             use_scale_shift_norm=use_scale_shift_norm,
+                #             down=True,
+                #         )
+                #         if resblock_updown
+                #         else Downsample(
+                #             ch, conv_resample, dims=dims, out_channels=out_ch
+                #         )
+                #     )
+                # )
+                #
                 ch = out_ch
                 input_block_chans.append(ch)
                 ds *= 2
@@ -685,8 +730,13 @@ class UNetModel(nn.Module):
                             num_head_channels=dim_head,
                             use_new_attention_order=use_new_attention_order,
                         ))
+            # logger.debug('num of input blocks:', len(self.input_blocks))
+            # logger.debug('num of input attns:', len(self.input_attns))
 
-
+        # logger.debug('---------------------------------------')
+        # print(self.input_blocks)
+        # logger.debug('---------------------------------------')
+        # print(self.input_attns)
         if num_head_channels == -1:
             dim_head = ch // num_heads
         else:
@@ -836,9 +886,9 @@ class UNetModel(nn.Module):
         assert (y is not None) == (
             self.num_classes is not None
         ), "must specify y if and only if the model is class-conditional"
-        h_xys = []
-        h_xts = []
-        h_yts = []
+        h_bgs = []
+        h_mos = []
+        h_ids = []
 
 
         # if timesteps is None:
@@ -855,114 +905,157 @@ class UNetModel(nn.Module):
         h = x.type(self.dtype)
         if cond != None:
             h = torch.cat([h, cond], dim=1)
+            logger.debug('here concat z and h together in time dimension')
         elif self.cond_model:
 
             h = torch.cat([h, self.zeros.repeat(h.size(0), 1, 1)], dim=1)
 
-        print('h shape: ', h.shape)
-        print('zeros shape: ', self.zeros.repeat(h.size(0), 1, 1).shape)
+        logger.debug('h shape: ', h.shape)
+        logger.debug('zeros shape: ', self.zeros.repeat(h.size(0), 1, 1).shape)
         # TODO: treat 32 and 16 as variables
 
-        h_xy = h[:, :, 0:32*32].view(h.size(0), h.size(1), 32, 32)
-        h_yt = h[:, :, 32*32:32*(32+16)].view(h.size(0), h.size(1), 16, 32)
-        h_xt = h[:, :, 32*(32+16):32*(32+16+16)].view(h.size(0), h.size(1), 16, 32)
-        # print('h_xy shape: ', h_xy.shape)
-        # print('h_yt shape: ', h_yt.shape)
-        # print('h_xt shape: ', h_xt.shape)
-        # print('input_blocks: ', len(self.input_blocks))
-        # print('input_attns : ', len(self.input_attns))
-        # print('start unet down sampling')
+        # h_bg = h[:, :, 0:32*32].view(h.size(0), h.size(1), 32, 32)
+        # h_id = h[:, :, 32*32:32*(32+16)].view(h.size(0), h.size(1), 16, 32)
+        # h_mo = h[:, :, 32*(32+16):32*(32+16+16)].view(h.size(0), h.size(1), 16, 32)
+        h_bg = h[:, :, :32 * 32].view(h.size(0), h.size(1), 32, 32)
+        h_id = h[:, :, 32 * 32: 32 * 32 + 16 * 16].view(h.size(0), h.size(1), 16, 16)
+        h_mo = h[:, :, 32 * 32 + 16 * 16:32 * 32 + 16 * 16 + 32 * 32].view(h.size(0), h.size(1), 32, 32)
+        # h_bg, h_id, h_mo = torch.chunk(h, 3, dim=-1)
+
+        # trial: reconstruct hc and hx based on only 1 frame for bg and id
+        # hc, hx = torch.chunk(h, 2, dim=1) # split by
+        # hx_bg, hx_id = hx[:, :1, :, :], hx[:, 1:2, :, :]
+        # hx_mo = hx[:, 2:, :, :]
+        # hc_bg, hc_id = hc[:, :1, :, :], hc[:, 1:2, :, :]
+        # hc_mo = hc[:, 2:, :, :]
+
+        # concat the two parts in time dimension
+        # h_bg = torch.cat([hc_bg, hx_bg], dim=1)
+        # h_id = torch.cat([hc_id, hx_id], dim=1)
+        # h_mo = torch.cat([hc_mo, hx_mo], dim=1)
+        #___________________________________________________________
+
+
+        logger.debug('h_bg shape: ', h_bg.shape)
+        logger.debug('h_id shape: ', h_id.shape)
+        logger.debug('h_mo shape: ', h_mo.shape)
+        # logger.debug('input_blocks: ', len(self.input_blocks))
+        # logger.debug('input_attns : ', len(self.input_attns))
+        # logger.debug('start unet down sampling')
+        counter = 0
         for module, input_attn in zip(self.input_blocks, self.input_attns):
-            # print('\tmodule: ', module)
-            # print('\tinput_attn: ', input_attn)
-            h_xy = module(h_xy, emb, context)
-            h_yt = module(h_yt, emb, context)
-            h_xt = module(h_xt, emb, context)
+            # logger.debug('\tinput_attn: ', input_attn)
+            h_bg = module(h_bg, emb, context)
+            h_id = module(h_id, emb, context)
+            h_mo = module(h_mo, emb, context)
 
-            res = h_xy.size(-2)
-            t   = h_xt.size(-2)
+            logger.debug('\th_bg shape after module: ', h_bg.shape)
+            logger.debug('\th_id shape after module: ', h_id.shape)
+            logger.debug('\th_mo shape after module: ', h_mo.shape)
 
-            h_xy = h_xy.view(h_xy.size(0), h_xy.size(1), -1)
-            h_yt = h_yt.view(h_yt.size(0), h_yt.size(1), -1)
-            h_xt = h_xt.view(h_xt.size(0), h_xt.size(1), -1)
+            # TODO: try to change res and t
+            res = h_bg.size(-2)
+            t   = h_id.size(-2)
+            logger.debug('\tres, t: ', res, t)
 
-            h = torch.cat([h_xy, h_yt, h_xt], dim=-1)
+            h_bg = h_bg.view(h_bg.size(0), h_bg.size(1), -1)
+            h_id = h_id.view(h_id.size(0), h_id.size(1), -1)
+            h_mo = h_mo.view(h_mo.size(0), h_mo.size(1), -1)
+
+            logger.debug('\th_bg shape after view: ', h_bg.shape)
+            logger.debug('\th_id shape after view: ', h_id.shape)
+            logger.debug('\th_mo shape after view: ', h_mo.shape)
+
+            # concatenate the three parts in last dimension
+            h = torch.cat([h_bg, h_id, h_mo], dim=-1)
             h = input_attn(h)
+            input_channels = 4
+            logger.debug('\th shape after input_attn: ', h.shape)
+            # h = h.reshape(h.size(0), h.size(1), input_channels, -1)
+            # res = 32
+            # t = 16
+            h_bg = h[:, :, :res*res].view(h.size(0), h.size(1), res, res)
+            h_id = h[:, :, res*res:res*res + t*t].view(h.size(0), h.size(1), t, t)
+            h_mo = h[:, :, res*res+t*t:res*res+t*t + res * res].view(h.size(0), h.size(1), res, res)
+            # h_bg, h_id, h_mo = torch.chunk(h, 3, dim=-1)
 
-            h_xy = h[:, :, 0:res*res].view(h.size(0), h.size(1), res, res)
-            h_yt = h[:, :, res*res:res*(res+t)].view(h.size(0), h.size(1), t, res)
-            h_xt = h[:, :, res*(res+t):res*(res+t+t)].view(h.size(0), h.size(1), t, res)
+            logger.debug('\th_bg shape after res*res: ', h_bg.shape)
+            logger.debug('\th_id shape after res*res: ', h_id.shape)
+            logger.debug('\th_mo shape after res*res: ', h_mo.shape)
 
-            h_xys.append(h_xy)
-            h_yts.append(h_yt)
-            h_xts.append(h_xt)
-            # print('\tappend h_xy shape: ', h_xy.shape)
-            # print('\tappend h_yt shape: ', h_yt.shape)
-            # print('\tappend h_xt shape: ', h_xt.shape)
-            # print()
+            h_bgs.append(h_bg)
+            h_ids.append(h_id)
+            h_mos.append(h_mo)
 
-        h_xy = self.middle_block(h_xy, emb, context)
-        h_yt = self.middle_block(h_yt, emb, context)
-        h_xt = self.middle_block(h_xt, emb, context)
+            logger.debug('\tin loop:', counter)
+            logger.debug('\tappend h_bg shape: ', h_bg.shape)
+            logger.debug('\tappend h_id shape: ', h_id.shape)
+            logger.debug('\tappend h_mo shape: ', h_mo.shape)
+            logger.debug()
+            counter += 1
 
-        res = h_xy.size(-2)
-        t   = h_xt.size(-2)
+        h_bg = self.middle_block(h_bg, emb, context)
+        h_id = self.middle_block(h_id, emb, context)
+        h_mo = self.middle_block(h_mo, emb, context)
 
-        h_xy = h_xy.view(h_xy.size(0), h_xy.size(1), -1)
-        h_yt = h_yt.view(h_yt.size(0), h_yt.size(1), -1)
-        h_xt = h_xt.view(h_xt.size(0), h_xt.size(1), -1)
+        res = h_bg.size(-2)
+        t   = h_id.size(-2)
 
-        h = torch.cat([h_xy, h_yt, h_xt], dim=-1)
+        h_bg = h_bg.view(h_bg.size(0), h_bg.size(1), -1)
+        h_id = h_id.view(h_id.size(0), h_id.size(1), -1)
+        h_mo = h_mo.view(h_mo.size(0), h_mo.size(1), -1)
+
+        h = torch.cat([h_bg, h_id, h_mo], dim=-1)
         h = self.mid_attn(h)
 
-        h_xy = h[:, :, 0:res*res].view(h.size(0), h.size(1), res, res)
-        h_yt = h[:, :, res*res:res*(res+t)].view(h.size(0), h.size(1), t, res)
-        h_xt = h[:, :, res*(res+t):res*(res+t+t)].view(h.size(0), h.size(1), t, res)
+        h_bg = h[:, :, :res * res].view(h.size(0), h.size(1), res, res)
+        h_id = h[:, :, res * res:res * res + t * t].view(h.size(0), h.size(1), t, t)
+        h_mo = h[:, :, res * res + t * t:res * res + t * t + res * res].view(h.size(0), h.size(1), res, res)
 
-        # print('start up sampling')
+        logger.debug('start up sampling')
         for module, output_attn in zip(self.output_blocks, self.output_attns):
-            # print('\tmodule: ', module)
-            # print('\toutput_attn: ', output_attn)
-            h_xy = th.cat([h_xy, h_xys.pop()], dim=1)
-            h_xy = module(h_xy, emb, context)
-            h_yt = th.cat([h_yt, h_yts.pop()], dim=1)
-            h_yt = module(h_yt, emb, context)
-            h_xt = th.cat([h_xt, h_xts.pop()], dim=1)
-            h_xt = module(h_xt, emb, context)
+            # logger.debug('\tmodule: ', module)
+            # logger.debug('\toutput_attn: ', output_attn)
+            h_bg = th.cat([h_bg, h_bgs.pop()], dim=1)
+            h_bg = module(h_bg, emb, context)
+            h_id = th.cat([h_id, h_ids.pop()], dim=1)
+            h_id = module(h_id, emb, context)
+            h_mo = th.cat([h_mo, h_mos.pop()], dim=1)
+            h_mo = module(h_mo, emb, context)
 
-            res = h_xy.size(-2)
-            t   = h_xt.size(-2)
+            res = h_bg.size(-2)
+            t   = h_id.size(-2)
 
-            h_xy = h_xy.view(h_xy.size(0), h_xy.size(1), -1)
-            h_yt = h_yt.view(h_yt.size(0), h_yt.size(1), -1)
-            h_xt = h_xt.view(h_xt.size(0), h_xt.size(1), -1)
+            h_bg = h_bg.view(h_bg.size(0), h_bg.size(1), -1)
+            h_id = h_id.view(h_id.size(0), h_id.size(1), -1)
+            h_mo = h_mo.view(h_mo.size(0), h_mo.size(1), -1)
 
-            h = torch.cat([h_xy, h_yt, h_xt], dim=-1)
+            h = torch.cat([h_bg, h_id, h_mo], dim=-1)
             h = output_attn(h)
 
-            h_xy = h[:, :, 0:res*res].view(h.size(0), h.size(1), res, res)
-            h_yt = h[:, :, res*res:res*(res+t)].view(h.size(0), h.size(1), t, res)
-            h_xt = h[:, :, res*(res+t):res*(res+t+t)].view(h.size(0), h.size(1), t, res)
-            # print('\tappend h_xy shape: ', h_xy.shape)
-            # print('\tappend h_yt shape: ', h_yt.shape)
-            # print('\tappend h_xt shape: ', h_xt.shape)
+            h_bg = h[:, :, :res*res].view(h.size(0), h.size(1), res, res)
+            h_id = h[:, :, res*res:res*res + t*t].view(h.size(0), h.size(1), t, t)
+            h_mo = h[:, :, res*res+t*t:res*res+t*t + res * res].view(h.size(0), h.size(1), res, res)
+            # logger.debug('\tappend h_bg shape: ', h_bg.shape)
+            # logger.debug('\tappend h_id shape: ', h_id.shape)
+            # logger.debug('\tappend h_mo shape: ', h_mo.shape)
             # print()
 
-        h_xy = self.out(h_xy)
-        h_yt = self.out(h_yt)
-        h_xt = self.out(h_xt)
-        # print('out h_xy shape: ', h_xy.shape)
-        # print('out h_yt shape: ', h_yt.shape)
-        # print('out h_xt shape: ', h_xt.shape)
-        h_xy = h_xy.view(h_xy.size(0), h_xy.size(1), -1)
-        h_yt = h_yt.view(h_yt.size(0), h_yt.size(1), -1)
-        h_xt = h_xt.view(h_xt.size(0), h_xt.size(1), -1)
-        # print('view out h_xy shape: ', h_xy.shape)
-        # print('view out h_yt shape: ', h_yt.shape)
-        # print('view out h_xt shape: ', h_xt.shape)
+        h_bg = self.out(h_bg)
+        h_id = self.out(h_id)
+        h_mo = self.out(h_mo)
+        # logger.debug('out h_bg shape: ', h_bg.shape)
+        # logger.debug('out h_id shape: ', h_id.shape)
+        # logger.debug('out h_mo shape: ', h_mo.shape)
+        h_bg = h_bg.view(h_bg.size(0), h_bg.size(1), -1)
+        h_id = h_id.view(h_id.size(0), h_id.size(1), -1)
+        h_mo = h_mo.view(h_mo.size(0), h_mo.size(1), -1)
+        # logger.debug('view out h_bg shape: ', h_bg.shape)
+        # logger.debug('view out h_id shape: ', h_id.shape)
+        # logger.debug('view out h_mo shape: ', h_mo.shape)
 
-        h = torch.cat([h_xy, h_yt, h_xt], dim=-1)
-        # print('cat out h shape: ', h.shape)
+        h = torch.cat([h_bg, h_id, h_mo], dim=-1)
+        logger.debug('cat out h shape: ', h.shape)
         h = h.type(x.dtype)
 
         return h
@@ -973,14 +1066,14 @@ if __name__ == '__main__':
     unet_path = '../../config/small_unet.yaml'
     unet_config = OmegaConf.load(unet_path).unet_config
     print(unet_config)
-    print('cuda: ', torch.torch.cuda.device_count())
+    logger.debug('cuda: ', torch.torch.cuda.device_count())
     num_frames = 5
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print('in this project, use device: ', device)
-    video_x = torch.randn(5, 4, 2048).to(device)
+    logger.debug('in this project, use device: ', device)
+    video_x = torch.randn(num_frames, 4, 2048).to(device)
     timesteps = torch.tensor([0, 1, 2, 3, 4]).to(device)
     unet = UNetModel(**unet_config).to(device)
     output = unet(video_x, timesteps=timesteps)
-    print('show output shape: ', output.shape)
+    logger.debug('show output shape: ', output.shape)
     
 

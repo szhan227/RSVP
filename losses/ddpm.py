@@ -21,6 +21,10 @@ from torchvision.utils import make_grid
 from inspect import isfunction
 import torch.nn.functional as F
 
+import utils
+
+logger = utils.logger
+
 def noise_like(shape, device, repeat=False):
     repeat_noise = lambda: torch.randn((1, *shape[1:]), device=device).repeat(shape[0], *((1,) * (len(shape) - 1)))
     noise = lambda: torch.randn(shape, device=device)
@@ -110,7 +114,7 @@ class DDPM(nn.Module):
         super().__init__()
         assert parameterization in ["eps", "x0"], 'currently only supporting "eps" and "x0"'
         self.parameterization = parameterization
-        print(f"{self.__class__.__name__}: Running in {self.parameterization}-prediction mode")
+        logger.debug(f"{self.__class__.__name__}: Running in {self.parameterization}-prediction mode")
         self.cond_stage_model = None
         self.clip_denoised = clip_denoised
         self.log_every_t = log_every_t
@@ -363,7 +367,7 @@ class DDPM(nn.Module):
         noise = default(noise, lambda: torch.randn_like(x_start))
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
         model_out = self.model(x_noisy, cond, t)
-
+        logger.debug('show model_out in p_losses', model_out.shape)
         loss_dict = {}
         if self.parameterization == "eps":
             target = noise

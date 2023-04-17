@@ -4,6 +4,9 @@ import torch.nn.functional as F
 from model.vq_vae.ResidualStack import ResidualStack
 from einops import rearrange
 
+import utils
+
+logger = utils.logger
 
 class Encoder_Identity(nn.Module):
     def __init__(self, num_hiddens, num_residual_layers, num_residual_hiddens,
@@ -62,7 +65,7 @@ class Encoder_Identity(nn.Module):
         B, T, C, H, W = x_id.shape
         # Step 1: 降低每帧的图像分辨率。  xs=[B, T, D, H // 2**ds, W // 2**ds]
         xs = rearrange(x_id, 'b t c h w -> (b t) c h w')
-        print('for id encoder: _ds_m = ', self._ds_m)
+        logger.debug('for id encoder: _ds_m = ', self._ds_m)
         for i in range(self._ds_m):
             h = self._layers[i](xs)
             xs = F.relu(h)

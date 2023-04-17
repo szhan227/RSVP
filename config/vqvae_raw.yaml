@@ -8,20 +8,17 @@ dataset:
   shuffle: False
   pin_memory: True
   train:
-#    idspath: datasets/UCF101/frames/train_fps4+8+16+32_ids.json
-    idspath: datasets/UCF101/frames/train_fps32_ids.json
-    usedfps: ~
-    datapath: datasets/UCF101/frames
+    idspath: datasets/FaceForensics/frames/train_fps4+8+16+32_ids.json
+    datapath: datasets/FaceForensics/frames
   val:
-#    idspath: datasets/UCF101/frames/valid_fps4+8+16+32_ids.json
-    idspath: datasets/UCF101/frames/valid_fps32_ids.json
-    usedfps: ~
-    datapath: datasets/UCF101/frames
+#    idspath: datasets/FaceForensics/frames/train_val_fps30_ids.json  # when test IS/FID
+    idspath: datasets/FaceForensics/frames/valid_fps32_ids.json
+    datapath: datasets/FaceForensics/frames
 
 model:
-  name: MoCoVQVAEwCDsCB_mo
+  name: MoCoVQVAE_wCD_shareCB
   pretrain_path: ~
-  checkpoint_path: ~
+  checkpoint_path: experiments/MoCoVQVAEwCDsCB_Face_im256_16frames_id4_2022-06-27-16-37-57/MoCoVQVAE_wCD_shareCB_iter80000.pth
   load_strict: True
 
   num_hiddens: 256
@@ -29,7 +26,7 @@ model:
   num_residual_hiddens: 128
 
   embedding_dim: 256
-  num_embeddings: 16384 # [4096, 9182, ...]
+  num_embeddings: 24576 # [4096, 8192, ...]
 
   ds_content: 3
   ds_motion: 5
@@ -66,7 +63,7 @@ train:
   find_unused_parameters: True
 
   # model params
-  exp_name: MoCoVQVAEwCDsCB_UCF_im256_16frames_id4_mo
+  exp_name: MoCoVQVAEwCDsCB_Face_im256_16frames_id4
   save_path: experiments/
 
   # train params
@@ -78,6 +75,5 @@ train:
   num_warmup_steps: 0  # null if want to set 0.1 warm up
   num_training_updates: 250000
   num_validation_steps: 2500
-  disc_start_step: 250000
-  fullbgid_start: 0
+  disc_start_step: 50000
   save_ckpt_per_iter: 5000

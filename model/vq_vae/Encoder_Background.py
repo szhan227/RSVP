@@ -3,7 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from model.vq_vae.ResidualStack import ResidualStack
 from einops import rearrange
+import utils
 
+logger = utils.logger
 
 class Encoder_Background(nn.Module):
     def __init__(self, num_hiddens, num_residual_layers, num_residual_hiddens,
@@ -62,10 +64,11 @@ class Encoder_Background(nn.Module):
         B, T, C, H, W = x_bg.shape
         # Step 1: 降低每帧的图像分辨率。  xs=[B, T, D, H // 2**ds, W // 2**ds]
         xs = rearrange(x_bg, 'b t c h w -> (b t) c h w')
-        print('for bg encoder, _ds_m = ', self._ds_m)
+        logger.debug('for bg encoder, _ds_m = ', self._ds_m, ', xs.shape = ', xs.shape, xs.dtype)
         for i in range(self._ds_m):
             h = self._layers[i](xs)
             xs = F.relu(h)
+            logger.debug(f'in bg _layer {i}, xs.shape = ', xs.shape, xs.dtype)
         _, D, HS, WS = xs.shape
 
         # Step 2: Dimension维度Concatenation。 z=[B, D', HS, WS]
@@ -76,7 +79,9 @@ class Encoder_Background(nn.Module):
             z = rearrange(zs, '(b hs ws) d -> b d hs ws',
                           b=B, d=D, hs=HS, ws=WS)
         elif self._suf_method == "conv":
+            logger.debug('in bg encoder conv, xs.shape = ', xs.shape, xs.dtype)
             xs = rearrange(xs, '(b t) d hs ws -> b (t d) hs ws', b=B)
+            logger.debug('in bg encoder conv after rearrange, xs.shape = ', xs.shape, xs.dtype)
             z = self._suf_layer(xs)
         else:
             z = None

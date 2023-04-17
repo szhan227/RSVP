@@ -6,6 +6,10 @@ from einops import rearrange
 from model.vq_vae.Attentions import MultiHeadAttention, PatchwiseSelfAttention3D
 from model.vq_vae.Swin_Block import SwinBlock
 
+import utils
+
+logger = utils.logger
+
 class Encoder_Motion(nn.Module):
     def __init__(self, num_hiddens, num_residual_layers, num_residual_hiddens, ds_motion,
                  n_head, d_model, d_kv, time_head):
@@ -53,7 +57,7 @@ class Encoder_Motion(nn.Module):
             h = self._layers[i](xs)
             xs = F.relu(h)
         _, D, HS, WS = xs.shape
-        print('for mo encoder: _ds_m = ', self._ds_m)
+        logger.debug('for mo encoder: _ds_m = ', self._ds_m)
         # Step 2: Self-attention
         _, _, H, W = xs.shape
         z = rearrange(xs, '(B N T) C H W -> (B N H W) T C', B=B, T=self._time_head)

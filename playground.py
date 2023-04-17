@@ -4,6 +4,8 @@ import numpy as np
 import yaml
 from torchvision import transforms
 from PIL import Image
+
+import utils
 from model.vq_vae.VQVAE import VQVAEModel
 from model.ldm.unet import UNetModel, DiffusionWrapper
 from model.ema import LitEma
@@ -11,12 +13,13 @@ from losses.ddpm import DDPM
 from omegaconf import OmegaConf
 from torch.cuda.amp import GradScaler, autocast
 import time
-from utils import AverageMeter
+from utils import AverageMeter, Logger
 import copy
 from einops import rearrange
 import random
+import datetime
 
-
+logger = utils.logger
 def preprocess():
     video_cap = cv2.VideoCapture('testvideo1.avi')
 
@@ -29,20 +32,21 @@ def preprocess():
     xt = np.array(xt)
     xt = torch.tensor(xt) / 127.5 - 1
     xt = xt.permute(0, 3, 1, 2)
-    print('xt.shape:', xt.shape, xt.dtype)
+    logger.debug('xt.shape:', xt.shape, xt.dtype)
 
-    num_frames = 10
+    # TODO: give 32 frames to encode, first half as condition, second half as inputs
+    num_frames = 32
     start = 0
 
-    transform = transforms.CenterCrop(64)
+    transform = transforms.Resize((256, 256))
 
     lower_bound = 0.2
     upper_bound = 0.8
     pre_img = transform(xt[start])
     nxt_img = transform(xt[start + 1])
 
-    print('pre_img.shape:', pre_img.shape)
-    print('nxt_img.shape:', nxt_img.shape)
+    logger.debug('pre_img.shape:', pre_img.shape)
+    logger.debug('nxt_img.shape:', nxt_img.shape)
 
     imgs, imgs_bg, imgs_id, imgs_mo = [], [], [], []
 
@@ -74,6 +78,10 @@ def preprocess():
     return [ret_img, ret_img_bg, ret_img_id, ret_img_mo]
 
 def play_with_MOSO_VAE():
+    logger.debug('cuda: ', torch.torch.cuda.device_count())
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    logger.debug('in this project, use device: ', device)
+
     video_cap = cv2.VideoCapture('testvideo1.avi')
 
     xt = []
@@ -84,21 +92,21 @@ def play_with_MOSO_VAE():
         xt.append(frame)
     xt = np.array(xt)
     xt = torch.tensor(xt) / 255.0
-    xt = xt.permute(0, 3, 1, 2)
-    print('xt.shape:', xt.shape, xt.dtype)
+    xt = xt.permute(0, 3, 1, 2).to(device)
+    logger.debug('xt.shape:', xt.shape, xt.dtype)
 
-    num_frames = 5
+    num_frames = 16
     start = 0
 
-    transform = transforms.CenterCrop(64)
+    transform = transforms.CenterCrop(256)
 
     lower_bound = 0.2
     upper_bound = 0.8
     pre_img = transform(xt[start])
     nxt_img = transform(xt[start + 1])
 
-    print('pre_img.shape:', pre_img.shape)
-    print('nxt_img.shape:', nxt_img.shape)
+    logger.debug('pre_img.shape:', pre_img.shape)
+    logger.debug('nxt_img.shape:', nxt_img.shape)
     imgs, imgs_bg, imgs_id, imgs_mo = [], [], [], []
 
     for i in range(start + 2, start + 2 + num_frames):
@@ -121,33 +129,34 @@ def play_with_MOSO_VAE():
     ret_img_id = torch.cat(imgs_id, dim=0)
     ret_img_mo = torch.cat(imgs_mo, dim=0)
 
-    ret_img = torch.unsqueeze(ret_img, dim=0)
-    ret_img_bg = torch.unsqueeze(ret_img_bg, dim=0)
-    ret_img_id = torch.unsqueeze(ret_img_id, dim=0)
-    ret_img_mo = torch.unsqueeze(ret_img_mo, dim=0)
+    ret_img = torch.unsqueeze(ret_img, dim=0).to(device)
+    ret_img_bg = torch.unsqueeze(ret_img_bg, dim=0).to(device)
+    ret_img_id = torch.unsqueeze(ret_img_id, dim=0).to(device)
+    ret_img_mo = torch.unsqueeze(ret_img_mo, dim=0).to(device)
 
-    print('ret_img.shape:', ret_img.shape)
-    print('ret_img_bg.shape:', ret_img_bg.shape)
-    print('ret_img_id.shape:', ret_img_id.shape)
-    print('ret_img_mo.shape:', ret_img_mo.shape)
+    logger.debug('ret_img.shape:', ret_img.shape)
+    logger.debug('ret_img_bg.shape:', ret_img_bg.shape)
+    logger.debug('ret_img_id.shape:', ret_img_id.shape)
+    logger.debug('ret_img_mo.shape:', ret_img_mo.shape)
 
     validate_inputs = [ret_img, ret_img, ret_img, ret_img_mo]
 
-    opt = yaml.load(open('config/vqvae.yaml', 'r'), Loader=yaml.FullLoader)
+    opt = yaml.load(open('config/vqvae_raw.yaml', 'r'), Loader=yaml.FullLoader)
     model_opt = opt['model']
-    model = VQVAEModel(model_opt, opt)
+    model = VQVAEModel(model_opt, opt).to(device)
 
+    logger.debug('before my_encode')
     bg_toks, id_toks, mo_toks = model.my_encode([ret_img, ret_img_bg, ret_img_id, ret_img_mo], is_training=False)
-    print('bg_toks.shape:', bg_toks.shape)
-    print('id_toks.shape:', id_toks.shape)
-    print('mo_toks.shape:', mo_toks.shape)
+    logger.debug('bg_toks.shape:', bg_toks.shape)
+    logger.debug('id_toks.shape:', id_toks.shape)
+    logger.debug('mo_toks.shape:', mo_toks.shape)
     outputs = model._decoder(bg_toks, id_toks, mo_toks)[0]
-    print('output.shape:', outputs.shape)
+    logger.debug('output.shape:', outputs.shape)
 
     # (5, 4, 2048)
-    # outputs = model(validate_inputs, is_training=False, writer=None)
+    outputs = model(validate_inputs, is_training=False, writer=None)
     # dict_keys(['loss', 'x_rec', 'quantize_bg', 'quantize_id', 'quantize_mo', 'ssim_metric', 'rec_loss', 'lpips_loss', 'record_logs', 'optimizer_idx'])
-    # print('outputs.shape:', outputs['x_rec'].shape)
+    logger.debug('outputs.shape:', outputs['x_rec'].shape)
 
 
 def play_with_PVDM_Diffuser():
@@ -155,11 +164,11 @@ def play_with_PVDM_Diffuser():
     unet_path = './config/small_unet.yaml'
     unet_config = OmegaConf.load(unet_path).unet_config
     print(unet_config)
-    print('cuda: ', torch.torch.cuda.device_count())
+    logger.debug('cuda: ', torch.torch.cuda.device_count())
     num_frames = 5
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print('in this project, use device: ', device)
-    video_x = torch.randn(5, 4, 2048).to(device)
+    logger.debug('in this project, use device: ', device)
+    video_x = torch.randn(1, 32, 4, 2048).to(device)
     timesteps = torch.tensor([0, 1, 2, 3, 4]).to(device)
     unet = UNetModel(**unet_config).to(device)
     ddpm = DiffusionWrapper(model=unet, conditioning_key=None)
@@ -170,31 +179,33 @@ def play_with_PVDM_Diffuser():
     # ddpm takes in latent representations z
 
     output = ddpm(x=video_x, cond=None, t=timesteps)
-    print('show output shape: ', output.shape)
+    logger.debug('show output shape: ', output.shape)
 
 
 
 def play_with_all_process():
+
+
     scaler = GradScaler()
 
-    logger = None
     rank = 0
     ema_model = None
     cond_prob = 0.3
 
     unet_path = './config/small_unet.yaml'
+    ldm_path = './config/ldm_base.yaml'
     unet_config = OmegaConf.load(unet_path).unet_config
-    print(unet_config)
-    print('cuda: ', torch.torch.cuda.device_count())
-    num_frames = 5
+    # unet_config = OmegaConf.load(ldm_path).model.params.unet_config
+    logger.debug(unet_config)
+    logger.debug('cuda: ', torch.torch.cuda.device_count())
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print('in this project, use device: ', device)
+    logger.debug('in this project, use device: ', device)
     video_x = torch.randn(5, 4, 2048).to(device)
     timesteps = torch.tensor([0, 1, 2, 3, 4]).to(device)
     unet = UNetModel(**unet_config).to(device)
     model = DiffusionWrapper(model=unet, conditioning_key=None).to(device)
 
-    moso_opt = yaml.load(open('config/vqvae.yaml', 'r'), Loader=yaml.FullLoader)
+    moso_opt = yaml.load(open('config/vqvae_raw.yaml', 'r'), Loader=yaml.FullLoader)
     moso_model_opt = moso_opt['model']
     first_stage_model = VQVAEModel(moso_model_opt, moso_opt).to(device)
 
@@ -246,23 +257,23 @@ def play_with_all_process():
 
     # d: number of decomposition, to be 4
     video_x = rearrange(video_x, 'd b t c h w -> b d t c h w')
-    print('video_x.shape: ', video_x.shape)
+    logger.debug('video_x.shape: ', video_x.shape)
     train_loader = [(video_x, None)]
 
     for it, (x, _) in enumerate(train_loader):
         x = x.to(device)
 
         x = rearrange(x, 'b d t c h w -> b d t c h w')
-        print('show x.shape: ', x.shape)
+        logger.debug('show x.shape: ', x.shape)
         # x = rearrange(x / 127.5 - 1, 'b t c h w -> b c t h w')  # videos
         # x_bg = rearrange(x_bg / 127.5 - 1, 'b t c h w -> b c t h w')  # videos
         # x_id = rearrange(x_id / 127.5 - 1, 'b t c h w -> b c t h w')  # videos
         # x_mo = rearrange(x_mo / 127.5 - 1, 'b t c h w -> b c t h w')  # videos
         #
-        # print('x.shape: ', x.shape)
-        # print('x_bg.shape: ', x_bg.shape)
-        # print('x_id.shape: ', x_id.shape)
-        # print('x_mo.shape: ', x_mo.shape)
+        # logger.debug('x.shape: ', x.shape)
+        # logger.debug('x_bg.shape: ', x_bg.shape)
+        # logger.debug('x_id.shape: ', x_id.shape)
+        # logger.debug('x_mo.shape: ', x_mo.shape)
 
         c = None
 
@@ -279,38 +290,83 @@ def play_with_all_process():
                 mask = (c + 1).contiguous().view(c.size(0), -1) ** 2
                 mask = torch.where(mask.sum(dim=-1) > 0, 1, 0).view(-1, 1, 1)
 
-                print('c.shape: ', c.shape)
-                print('x.shape: ', x.shape)
+                logger.debug('c.shape: ', c.shape)
+                logger.debug('x.shape: ', x.shape)
                 with autocast():
                     with torch.no_grad():
                         x_img, x_bg, x_id, x_mo = x[:, 0, :, :, :, :], x[:, 1, :, :, :, :], x[:, 2, :, :, :, :], x[:, 3, :, :, :, :]
                         c_img, c_bg, c_id, c_mo = c[:, 0, :, :, :, :], c[:, 1, :, :, :, :], c[:, 2, :, :, :, :], c[:, 3, :, :, :, :]
 
-                        print('x dtype: ', x.dtype)
-                        print('x_img.shape: ', x_img.shape)
-                        print('x_bg.shape: ', x_bg.shape)
-                        print('x_id.shape: ', x_id.shape)
-                        print('x_mo.shape: ', x_mo.shape)
+                        logger.debug('x dtype: ', x.dtype)
+                        logger.debug('x_img.shape: ', x_img.shape, x_img.dtype)
+                        logger.debug('x_bg.shape: ', x_bg.shape, x_bg.dtype)
+                        logger.debug('x_id.shape: ', x_id.shape, x_id.dtype)
+                        logger.debug('x_mo.shape: ', x_mo.shape, x_mo.dtype)
                         # bg_toks, id_toks, mo_toks = first_stage_model.my_encode([ret_img, ret_img_bg, ret_img_id, ret_img_mo], is_training=False)
 
+                        # test extract token here
+                        ex_tok = False
+                        if ex_tok:
+                            inputs = x_img, x_bg, x_id, x_mo
+                            bg_toks, id_toks, mo_toks = first_stage_model.extract_tokens(inputs, is_training=False)
+                            logger.debug('output: ')
+                            logger.debug('bg_toks.shape: ', bg_toks.shape, bg_toks.dtype)
+                            logger.debug('id_toks.shape: ', id_toks.shape, id_toks.dtype)
+                            logger.debug('mo_toks.shape: ', mo_toks.shape, mo_toks.dtype)
+
+                            return
+
                         # Keep number of frames of x and c the same, now 5
+
                         xbg_toks, xid_toks, xmo_toks = first_stage_model.my_encode([x_img, x_bg, x_id, x_mo], is_training=False)
                         cbg_toks, cid_toks, cmo_toks = first_stage_model.my_encode([c_img, c_bg, c_id, c_mo], is_training=False)
 
 
-                        print('xbg_toks.shape: ', xbg_toks.shape)
-                        print('xid_toks.shape: ', xid_toks.shape)
-                        print('xmo_toks.shape: ', xmo_toks.shape)
-                        print('cbg_toks.shape: ', cbg_toks.shape)
-                        print('cid_toks.shape: ', cid_toks.shape)
-                        print('cmo_toks.shape: ', cmo_toks.shape)
+
+                        # logger.debug('cbg_toks.shape: ', cbg_toks.shape)
+                        # logger.debug('cid_toks.shape: ', cid_toks.shape)
+                        # logger.debug('cmo_toks.shape: ', cmo_toks.shape)
+
+                        # t = 1
+
+                        # change 16 to num_frames
+                        # xbg_toks = xbg_toks.repeat(1, 16, 1, 1, 1)
+                        xbg_toks = rearrange(xbg_toks, 'b t c h w -> b c (t h w)')
+
+                        # xid_toks = xid_toks.repeat(1, 16, 1, 1, 1)
+                        xid_toks = rearrange(xid_toks, 'b t c h w -> b c (t h w)')
+
+                        xmo_toks = rearrange(xmo_toks, 'b t c h w -> b c (t h w)')
+
+                        # cbg_toks = cbg_toks.repeat(1, 16, 1, 1, 1)
+                        cbg_toks = rearrange(cbg_toks, 'b t c h w -> b c (t h w)')
+
+                        # cid_toks = cid_toks.repeat(1, 16, 1, 1, 1)
+                        cid_toks = rearrange(cid_toks, 'b t c h w -> b c (t h w)')
+
+                        cmo_toks = rearrange(cmo_toks, 'b t c h w -> b c (t h w)')
+
+
+                        logger.debug('xbg_toks.shape: ', xbg_toks.shape)
+                        logger.debug('xid_toks.shape: ', xid_toks.shape)
+                        logger.debug('xmo_toks.shape: ', xmo_toks.shape)
                         # z = first_stage_model.module.extract(x).detach()
                         # c = first_stage_model.module.extract(c).detach()
-                        z = torch.concat([xbg_toks, xid_toks, xmo_toks], dim=-1)
-                        c = torch.concat([cbg_toks, cid_toks, cmo_toks], dim=-1)
+
+                        # here bg_toks, id_toks only have 1 frame in time dimension
+                        # but mo_toks have num_frame many frames in time dimension
+                        # option1: repeat bg_toks, id_toks to have num_frame many frames in time dimension
+                        #          waste memory
+                        # option2: concat bg_toks, id_toks, mo_toks in time dimension.
+                        concat_dim = -1 # concat in dimension: -1 for latent, 1 for time
+                        z = torch.concat([xbg_toks, xid_toks, xmo_toks], dim=concat_dim)
+                        c = torch.concat([cbg_toks, cid_toks, cmo_toks], dim=concat_dim)
 
 
                         c = c * mask + torch.zeros_like(c).to(c.device) * (1 - mask)
+
+                        logger.debug('show z.shape: ', z.shape)
+                        logger.debug('show c.shape: ', c.shape)
 
             else:
                 c, x_tmp = torch.chunk(x, 2, dim=2)
@@ -324,8 +380,8 @@ def play_with_all_process():
                     with torch.no_grad():
                         z = first_stage_model.module.extract(x).detach()
                         c = torch.zeros_like(z).to(device)
-            print('show z.shape: ', z.shape)
-            print('show c.shape: ', c.shape)
+            logger.debug('show z.shape: ', z.shape)
+            logger.debug('show c.shape: ', c.shape)
             (loss, t), loss_dict = criterion(z.float(), c.float())
 
         else:

@@ -8,7 +8,7 @@ dataset:
   pin_memory: True
   shuffle: True
   ret_mode: list
-  num_frames: 5
+  num_frames: 4
 
   # specify train set
   train: None
@@ -30,8 +30,8 @@ model:
 
   # To keep the last two dimension same for output of vqvae, we currently set ds_mo = ds_id = ds_bg = 3
   ds_content: 3
-  ds_motion: 3
-  ds_identity: 3
+  ds_motion: 5
+  ds_identity: 4
   ds_background: 3
   suf_method: conv # [avg_pool, max_pool, conv]
   encoder_mo_type: default
