@@ -7,6 +7,9 @@ import torch as torch
 import torch.nn as nn
 import ipdb
 from einops import repeat, rearrange
+import utils
+
+logger = utils.logger
 
 class ExponentialMovingAverage(nn.Module):
     """Maintains an exponential moving average for a value.
@@ -278,8 +281,10 @@ class VectorQuantizerEMA(nn.Module):
         """tokens: [B, T, H, W]"""
         B, T, H, W = tokens.shape
         encoding_indices = rearrange(tokens, 'B T H W -> (B T H W)')
+        logger.debug('show encoding indices:', encoding_indices.shape)
         encodings = F.one_hot(encoding_indices
                               , self.num_embeddings).to(torch.float32)
+        logger.debug('show encodings:', encodings.shape)
         quantized = self.quantize(encodings)
         quantized = rearrange(quantized, '(B T H W) C -> (B T) C H W', B=B, T=T, H=H, W=W)
         return quantized

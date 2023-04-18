@@ -263,6 +263,7 @@ def play_with_all_process():
     for it, (x, _) in enumerate(train_loader):
         x = x.to(device)
 
+        batch_size = x.shape[0]
         x = rearrange(x, 'b d t c h w -> b d t c h w')
         logger.debug('show x.shape: ', x.shape)
         # x = rearrange(x / 127.5 - 1, 'b t c h w -> b c t h w')  # videos
@@ -305,62 +306,56 @@ def play_with_all_process():
                         # bg_toks, id_toks, mo_toks = first_stage_model.my_encode([ret_img, ret_img_bg, ret_img_id, ret_img_mo], is_training=False)
 
                         # test extract token here
-                        ex_tok = False
-                        if ex_tok:
-                            inputs = x_img, x_bg, x_id, x_mo
-                            bg_toks, id_toks, mo_toks = first_stage_model.extract_tokens(inputs, is_training=False)
-                            logger.debug('output: ')
-                            logger.debug('bg_toks.shape: ', bg_toks.shape, bg_toks.dtype)
-                            logger.debug('id_toks.shape: ', id_toks.shape, id_toks.dtype)
-                            logger.debug('mo_toks.shape: ', mo_toks.shape, mo_toks.dtype)
-
-                            return
+                        # ex_tok = False
+                        # if ex_tok:
+                        #     inputs = x_img, x_bg, x_id, x_mo
+                        #     bg_toks, id_toks, mo_toks = first_stage_model.extract_tokens(inputs, is_training=False)
+                        #     logger.debug('output: ')
+                        #     logger.debug('bg_toks.shape: ', bg_toks.shape, bg_toks.dtype)
+                        #     logger.debug('id_toks.shape: ', id_toks.shape, id_toks.dtype)
+                        #     logger.debug('mo_toks.shape: ', mo_toks.shape, mo_toks.dtype)
+                        #
+                        #     return
 
                         # Keep number of frames of x and c the same, now 5
 
-                        xbg_toks, xid_toks, xmo_toks = first_stage_model.my_encode([x_img, x_bg, x_id, x_mo], is_training=False)
-                        cbg_toks, cid_toks, cmo_toks = first_stage_model.my_encode([c_img, c_bg, c_id, c_mo], is_training=False)
+                        xbg_quantized, xid_quantized, xmo_quantized = first_stage_model.my_encode([x_img, x_bg, x_id, x_mo], is_training=False)
+                        cbg_quantized, cid_quantized, cmo_quantized = first_stage_model.my_encode([c_img, c_bg, c_id, c_mo], is_training=False)
+                        # xbg_quantized, xid_quantized, xmo_quantized = first_stage_model.extract_tokens([x_img, x_bg, x_id, x_mo], is_training=False)
+                        # cbg_quantized, cid_quantized, cmo_quantized = first_stage_model.extract_tokens([c_img, c_bg, c_id, c_mo], is_training=False)
 
 
 
-                        # logger.debug('cbg_toks.shape: ', cbg_toks.shape)
-                        # logger.debug('cid_toks.shape: ', cid_toks.shape)
-                        # logger.debug('cmo_toks.shape: ', cmo_toks.shape)
+                        logger.debug('cbg_quantized.shape: ', cbg_quantized.shape, cbg_quantized.dtype)
+                        logger.debug('cid_quantized.shape: ', cid_quantized.shape, cbg_quantized.dtype)
+                        logger.debug('cmo_quantized.shape: ', cmo_quantized.shape, cbg_quantized.dtype)
 
                         # t = 1
 
                         # change 16 to num_frames
-                        # xbg_toks = xbg_toks.repeat(1, 16, 1, 1, 1)
-                        xbg_toks = rearrange(xbg_toks, 'b t c h w -> b c (t h w)')
+                        xbg_quantized = rearrange(xbg_quantized, 'b t c h w -> b c (t h w)')
+                        xid_quantized = rearrange(xid_quantized, 'b t c h w -> b c (t h w)')
+                        xmo_quantized = rearrange(xmo_quantized, 'b t c h w -> b c (t h w)')
 
-                        # xid_toks = xid_toks.repeat(1, 16, 1, 1, 1)
-                        xid_toks = rearrange(xid_toks, 'b t c h w -> b c (t h w)')
-
-                        xmo_toks = rearrange(xmo_toks, 'b t c h w -> b c (t h w)')
-
-                        # cbg_toks = cbg_toks.repeat(1, 16, 1, 1, 1)
-                        cbg_toks = rearrange(cbg_toks, 'b t c h w -> b c (t h w)')
-
-                        # cid_toks = cid_toks.repeat(1, 16, 1, 1, 1)
-                        cid_toks = rearrange(cid_toks, 'b t c h w -> b c (t h w)')
-
-                        cmo_toks = rearrange(cmo_toks, 'b t c h w -> b c (t h w)')
+                        cbg_quantized = rearrange(cbg_quantized, 'b t c h w -> b c (t h w)')
+                        cid_quantized = rearrange(cid_quantized, 'b t c h w -> b c (t h w)')
+                        cmo_quantized = rearrange(cmo_quantized, 'b t c h w -> b c (t h w)')
 
 
-                        logger.debug('xbg_toks.shape: ', xbg_toks.shape)
-                        logger.debug('xid_toks.shape: ', xid_toks.shape)
-                        logger.debug('xmo_toks.shape: ', xmo_toks.shape)
+                        logger.debug('xbg_quantized.shape: ', xbg_quantized.shape)
+                        logger.debug('xid_quantized.shape: ', xid_quantized.shape)
+                        logger.debug('xmo_quantized.shape: ', xmo_quantized.shape)
                         # z = first_stage_model.module.extract(x).detach()
                         # c = first_stage_model.module.extract(c).detach()
 
-                        # here bg_toks, id_toks only have 1 frame in time dimension
-                        # but mo_toks have num_frame many frames in time dimension
-                        # option1: repeat bg_toks, id_toks to have num_frame many frames in time dimension
+                        # here bg_quantized, id_quantized only have 1 frame in time dimension
+                        # but mo_quantized have num_frame many frames in time dimension
+                        # option1: repeat bg_quantized, id_quantized to have num_frame many frames in time dimension
                         #          waste memory
-                        # option2: concat bg_toks, id_toks, mo_toks in time dimension.
+                        # option2: concat bg_quantized, id_quantized, mo_quantized in time dimension.
                         concat_dim = -1 # concat in dimension: -1 for latent, 1 for time
-                        z = torch.concat([xbg_toks, xid_toks, xmo_toks], dim=concat_dim)
-                        c = torch.concat([cbg_toks, cid_toks, cmo_toks], dim=concat_dim)
+                        z = torch.concat([xbg_quantized, xid_quantized, xmo_quantized], dim=concat_dim)
+                        c = torch.concat([cbg_quantized, cid_quantized, cmo_quantized], dim=concat_dim)
 
 
                         c = c * mask + torch.zeros_like(c).to(c.device) * (1 - mask)
@@ -445,6 +440,5 @@ if __name__ == '__main__':
     # play_with_PVDM_Diffuser()
 
     play_with_all_process()
-
 
 
