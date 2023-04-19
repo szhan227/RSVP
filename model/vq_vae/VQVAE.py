@@ -422,6 +422,23 @@ class VQVAEModel(nn.Module):
 
         return bg_tokens, id_tokens, mo_tokens
 
+    def get_quantized_by_tokens(self, bg_tokens, id_tokens, mo_tokens):
+        B = bg_tokens.shape[0]
+
+        vq_bg = self._vq_ema.quantize_code(bg_tokens)
+        vq_id = self._vq_ema.quantize_code(id_tokens)
+        vq_mo = self._vq_ema.quantize_code(mo_tokens)
+
+        quantized_bg = self._suf_vq_bg(vq_bg)
+        quantized_id = self._suf_vq_id(vq_id)
+        quantized_mo = self._suf_vq_mo(vq_mo)
+
+        quantized_bg = rearrange(quantized_bg, "(b t) c h w -> b t c h w", b=B)
+        quantized_id = rearrange(quantized_id, "(b t) c h w -> b t c h w", b=B)
+        quantized_mo = rearrange(quantized_mo, "(b t) c h w -> b t c h w", b=B)
+
+        return quantized_bg, quantized_id, quantized_mo
+
     def calculate_adaptive_weight(self, nll_loss, g_loss, last_layer):
         nll_grads = torch.autograd.grad(nll_loss, last_layer, retain_graph=True)[0]
         g_grads = torch.autograd.grad(g_loss, last_layer, retain_graph=True)[0]

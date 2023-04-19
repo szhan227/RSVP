@@ -261,6 +261,12 @@ def play_with_all_process():
     train_loader = [(video_x, None)]
 
     for it, (x, _) in enumerate(train_loader):
+
+        # TODO: input mode(options): train_loader should contains [tokens, quantized]
+        # pretrained vqvae model: batch_size = 2
+        #                         num_batch =
+        # Now for quantized
+
         x = x.to(device)
 
         batch_size = x.shape[0]
@@ -425,6 +431,14 @@ def play_with_all_process():
         #         log_('[Time %.3f] [FVD %f]' %
         #              (time.time() - check, fvd))
 
+
+def play_with_diffusion_train():
+
+    train_datalodaer = None
+
+    vqvae = None # load from pretrained
+
+    # TODO: finish the training code
 
 if __name__ == '__main__':
     # play_with_MOSO_VAE()

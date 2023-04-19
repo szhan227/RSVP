@@ -207,6 +207,6 @@ def make_mixed_pairs(l, t1, t2, given_vid_real, given_vid_fake):
 
 
 global logger
-msg_level = 'info'
+msg_level = 'debug'
 logger = Logger(f'log_{msg_level}_{time.time()}', level=msg_level)
 

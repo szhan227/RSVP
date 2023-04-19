@@ -1,0 +1,307 @@
+{'image_size': 32, 'in_channels': 256, 'out_channels': 256, 'model_channels': 32, 'attention_resolutions': [4, 2, 1], 'num_res_blocks': 2, 'channel_mult': [1, 2, 4, 4], 'num_heads': 8, 'use_scale_shift_norm': True, 'resblock_updown': True, 'cond_model': True}
+cuda:  1
+in this project, use device:  cuda
+before loop:
+num of input blocks: 1
+num of input attns: 1
+!!!!!!!!!!! time head: 16 !!!!!!!!!!!!!
+!!! ABS_weight: 1.0
+!!! MSE_weight: 0
+!!! SSIM_weight: 0
+contructing model...
+ds_background:  3
+num_hiddens:  256
+num_residual_layers:  4
+num_residual_hiddens:  128
+suf_method:  conv
+n_frames:  16
+Loading Motion Encoder: Encoder_Motion...
+DDPM: Running in eps-prediction mode
+xt.shape: torch.Size([122, 3, 240, 320]) torch.float32
+pre_img.shape: torch.Size([3, 256, 256])
+nxt_img.shape: torch.Size([3, 256, 256])
+video_x.shape:  torch.Size([1, 4, 32, 3, 256, 256])
+show x.shape:  torch.Size([1, 4, 32, 3, 256, 256])
+c.shape:  torch.Size([1, 4, 16, 3, 256, 256])
+x.shape:  torch.Size([1, 4, 16, 3, 256, 256])
+x dtype:  torch.float32
+x_img.shape:  torch.Size([1, 16, 3, 256, 256]) torch.float32
+x_bg.shape:  torch.Size([1, 16, 3, 256, 256]) torch.float32
+x_id.shape:  torch.Size([1, 16, 3, 256, 256]) torch.float32
+x_mo.shape:  torch.Size([1, 16, 3, 256, 256]) torch.float32
+for bg encoder, _ds_m =  3 , xs.shape =  torch.Size([16, 3, 256, 256]) torch.float32
+in bg _layer 0, xs.shape =  torch.Size([16, 256, 128, 128]) torch.float16
+in bg _layer 1, xs.shape =  torch.Size([16, 256, 64, 64]) torch.float16
+in bg _layer 2, xs.shape =  torch.Size([16, 256, 32, 32]) torch.float16
+in bg encoder conv, xs.shape =  torch.Size([16, 256, 32, 32]) torch.float16
+in bg encoder conv after rearrange, xs.shape =  torch.Size([1, 4096, 32, 32]) torch.float16
+for id encoder: _ds_m =  4
+for mo encoder: _ds_m =  5
+feat_bg.shape:  torch.Size([1, 1, 256, 32, 32])
+feat_id.shape:  torch.Size([1, 1, 256, 16, 16])
+feat_mo.shape:  torch.Size([1, 16, 256, 8, 8])
+vq_output_bg:
+loss torch.Size([]) torch.float32
+quantize torch.Size([1, 256, 32, 32]) torch.float16
+perplexity torch.Size([]) torch.float32
+encodings torch.Size([1024, 24576]) torch.float32
+encoding_indices torch.Size([1, 32, 32]) torch.int64
+vq_output_id:
+loss torch.Size([]) torch.float32
+quantize torch.Size([1, 256, 16, 16]) torch.float16
+perplexity torch.Size([]) torch.float32
+encodings torch.Size([256, 24576]) torch.float32
+encoding_indices torch.Size([1, 16, 16]) torch.int64
+vq_output_mo:
+loss torch.Size([]) torch.float32
+quantize torch.Size([16, 256, 8, 8]) torch.float16
+perplexity torch.Size([]) torch.float32
+encodings torch.Size([1024, 24576]) torch.float32
+encoding_indices torch.Size([16, 8, 8]) torch.int64
+quantize_bg.shape:  torch.Size([1, 1, 256, 32, 32])
+quantize_id.shape:  torch.Size([1, 1, 256, 16, 16])
+quantize_mo.shape:  torch.Size([1, 16, 256, 8, 8])
+for bg encoder, _ds_m =  3 , xs.shape =  torch.Size([16, 3, 256, 256]) torch.float32
+in bg _layer 0, xs.shape =  torch.Size([16, 256, 128, 128]) torch.float16
+in bg _layer 1, xs.shape =  torch.Size([16, 256, 64, 64]) torch.float16
+in bg _layer 2, xs.shape =  torch.Size([16, 256, 32, 32]) torch.float16
+in bg encoder conv, xs.shape =  torch.Size([16, 256, 32, 32]) torch.float16
+in bg encoder conv after rearrange, xs.shape =  torch.Size([1, 4096, 32, 32]) torch.float16
+for id encoder: _ds_m =  4
+for mo encoder: _ds_m =  5
+feat_bg.shape:  torch.Size([1, 1, 256, 32, 32])
+feat_id.shape:  torch.Size([1, 1, 256, 16, 16])
+feat_mo.shape:  torch.Size([1, 16, 256, 8, 8])
+vq_output_bg:
+loss torch.Size([]) torch.float32
+quantize torch.Size([1, 256, 32, 32]) torch.float16
+perplexity torch.Size([]) torch.float32
+encodings torch.Size([1024, 24576]) torch.float32
+encoding_indices torch.Size([1, 32, 32]) torch.int64
+vq_output_id:
+loss torch.Size([]) torch.float32
+quantize torch.Size([1, 256, 16, 16]) torch.float16
+perplexity torch.Size([]) torch.float32
+encodings torch.Size([256, 24576]) torch.float32
+encoding_indices torch.Size([1, 16, 16]) torch.int64
+vq_output_mo:
+loss torch.Size([]) torch.float32
+quantize torch.Size([16, 256, 8, 8]) torch.float16
+perplexity torch.Size([]) torch.float32
+encodings torch.Size([1024, 24576]) torch.float32
+encoding_indices torch.Size([16, 8, 8]) torch.int64
+quantize_bg.shape:  torch.Size([1, 1, 256, 32, 32])
+quantize_id.shape:  torch.Size([1, 1, 256, 16, 16])
+quantize_mo.shape:  torch.Size([1, 16, 256, 8, 8])
+cbg_quantized.shape:  torch.Size([1, 1, 256, 32, 32]) torch.float16
+cid_quantized.shape:  torch.Size([1, 1, 256, 16, 16]) torch.float16
+cmo_quantized.shape:  torch.Size([1, 16, 256, 8, 8]) torch.float16
+xbg_quantized.shape:  torch.Size([1, 256, 1024])
+xid_quantized.shape:  torch.Size([1, 256, 256])
+xmo_quantized.shape:  torch.Size([1, 256, 1024])
+show z.shape:  torch.Size([1, 256, 2304])
+show c.shape:  torch.Size([1, 256, 2304])
+show z.shape:  torch.Size([1, 256, 2304])
+show c.shape:  torch.Size([1, 256, 2304])
+here concat z and h together in time dimension
+h shape:  torch.Size([1, 512, 2304])
+zeros shape:  torch.Size([1, 256, 2048])
+h_bg shape:  torch.Size([1, 512, 32, 32])
+h_id shape:  torch.Size([1, 512, 16, 16])
+h_mo shape:  torch.Size([1, 512, 32, 32])
+	h_bg shape after module:  torch.Size([1, 32, 32, 32])
+	h_id shape after module:  torch.Size([1, 32, 16, 16])
+	h_mo shape after module:  torch.Size([1, 32, 32, 32])
+	res, t:  32 16
+	h_bg shape after view:  torch.Size([1, 32, 1024])
+	h_id shape after view:  torch.Size([1, 32, 256])
+	h_mo shape after view:  torch.Size([1, 32, 1024])
+	h shape after input_attn:  torch.Size([1, 32, 2304])
+	h_bg shape after res*res:  torch.Size([1, 32, 32, 32])
+	h_id shape after res*res:  torch.Size([1, 32, 16, 16])
+	h_mo shape after res*res:  torch.Size([1, 32, 32, 32])
+	in loop: 0
+	append h_bg shape:  torch.Size([1, 32, 32, 32])
+	append h_id shape:  torch.Size([1, 32, 16, 16])
+	append h_mo shape:  torch.Size([1, 32, 32, 32])
+
+	h_bg shape after module:  torch.Size([1, 32, 32, 32])
+	h_id shape after module:  torch.Size([1, 32, 16, 16])
+	h_mo shape after module:  torch.Size([1, 32, 32, 32])
+	res, t:  32 16
+	h_bg shape after view:  torch.Size([1, 32, 1024])
+	h_id shape after view:  torch.Size([1, 32, 256])
+	h_mo shape after view:  torch.Size([1, 32, 1024])
+	h shape after input_attn:  torch.Size([1, 32, 2304])
+	h_bg shape after res*res:  torch.Size([1, 32, 32, 32])
+	h_id shape after res*res:  torch.Size([1, 32, 16, 16])
+	h_mo shape after res*res:  torch.Size([1, 32, 32, 32])
+	in loop: 1
+	append h_bg shape:  torch.Size([1, 32, 32, 32])
+	append h_id shape:  torch.Size([1, 32, 16, 16])
+	append h_mo shape:  torch.Size([1, 32, 32, 32])
+
+	h_bg shape after module:  torch.Size([1, 32, 32, 32])
+	h_id shape after module:  torch.Size([1, 32, 16, 16])
+	h_mo shape after module:  torch.Size([1, 32, 32, 32])
+	res, t:  32 16
+	h_bg shape after view:  torch.Size([1, 32, 1024])
+	h_id shape after view:  torch.Size([1, 32, 256])
+	h_mo shape after view:  torch.Size([1, 32, 1024])
+	h shape after input_attn:  torch.Size([1, 32, 2304])
+	h_bg shape after res*res:  torch.Size([1, 32, 32, 32])
+	h_id shape after res*res:  torch.Size([1, 32, 16, 16])
+	h_mo shape after res*res:  torch.Size([1, 32, 32, 32])
+	in loop: 2
+	append h_bg shape:  torch.Size([1, 32, 32, 32])
+	append h_id shape:  torch.Size([1, 32, 16, 16])
+	append h_mo shape:  torch.Size([1, 32, 32, 32])
+
+	h_bg shape after module:  torch.Size([1, 32, 16, 16])
+	h_id shape after module:  torch.Size([1, 32, 8, 8])
+	h_mo shape after module:  torch.Size([1, 32, 16, 16])
+	res, t:  16 8
+	h_bg shape after view:  torch.Size([1, 32, 256])
+	h_id shape after view:  torch.Size([1, 32, 64])
+	h_mo shape after view:  torch.Size([1, 32, 256])
+	h shape after input_attn:  torch.Size([1, 32, 576])
+	h_bg shape after res*res:  torch.Size([1, 32, 16, 16])
+	h_id shape after res*res:  torch.Size([1, 32, 8, 8])
+	h_mo shape after res*res:  torch.Size([1, 32, 16, 16])
+	in loop: 3
+	append h_bg shape:  torch.Size([1, 32, 16, 16])
+	append h_id shape:  torch.Size([1, 32, 8, 8])
+	append h_mo shape:  torch.Size([1, 32, 16, 16])
+
+	h_bg shape after module:  torch.Size([1, 64, 16, 16])
+	h_id shape after module:  torch.Size([1, 64, 8, 8])
+	h_mo shape after module:  torch.Size([1, 64, 16, 16])
+	res, t:  16 8
+	h_bg shape after view:  torch.Size([1, 64, 256])
+	h_id shape after view:  torch.Size([1, 64, 64])
+	h_mo shape after view:  torch.Size([1, 64, 256])
+	h shape after input_attn:  torch.Size([1, 64, 576])
+	h_bg shape after res*res:  torch.Size([1, 64, 16, 16])
+	h_id shape after res*res:  torch.Size([1, 64, 8, 8])
+	h_mo shape after res*res:  torch.Size([1, 64, 16, 16])
+	in loop: 4
+	append h_bg shape:  torch.Size([1, 64, 16, 16])
+	append h_id shape:  torch.Size([1, 64, 8, 8])
+	append h_mo shape:  torch.Size([1, 64, 16, 16])
+
+	h_bg shape after module:  torch.Size([1, 64, 16, 16])
+	h_id shape after module:  torch.Size([1, 64, 8, 8])
+	h_mo shape after module:  torch.Size([1, 64, 16, 16])
+	res, t:  16 8
+	h_bg shape after view:  torch.Size([1, 64, 256])
+	h_id shape after view:  torch.Size([1, 64, 64])
+	h_mo shape after view:  torch.Size([1, 64, 256])
+	h shape after input_attn:  torch.Size([1, 64, 576])
+	h_bg shape after res*res:  torch.Size([1, 64, 16, 16])
+	h_id shape after res*res:  torch.Size([1, 64, 8, 8])
+	h_mo shape after res*res:  torch.Size([1, 64, 16, 16])
+	in loop: 5
+	append h_bg shape:  torch.Size([1, 64, 16, 16])
+	append h_id shape:  torch.Size([1, 64, 8, 8])
+	append h_mo shape:  torch.Size([1, 64, 16, 16])
+
+	h_bg shape after module:  torch.Size([1, 64, 8, 8])
+	h_id shape after module:  torch.Size([1, 64, 4, 4])
+	h_mo shape after module:  torch.Size([1, 64, 8, 8])
+	res, t:  8 4
+	h_bg shape after view:  torch.Size([1, 64, 64])
+	h_id shape after view:  torch.Size([1, 64, 16])
+	h_mo shape after view:  torch.Size([1, 64, 64])
+	h shape after input_attn:  torch.Size([1, 64, 144])
+	h_bg shape after res*res:  torch.Size([1, 64, 8, 8])
+	h_id shape after res*res:  torch.Size([1, 64, 4, 4])
+	h_mo shape after res*res:  torch.Size([1, 64, 8, 8])
+	in loop: 6
+	append h_bg shape:  torch.Size([1, 64, 8, 8])
+	append h_id shape:  torch.Size([1, 64, 4, 4])
+	append h_mo shape:  torch.Size([1, 64, 8, 8])
+
+	h_bg shape after module:  torch.Size([1, 128, 8, 8])
+	h_id shape after module:  torch.Size([1, 128, 4, 4])
+	h_mo shape after module:  torch.Size([1, 128, 8, 8])
+	res, t:  8 4
+	h_bg shape after view:  torch.Size([1, 128, 64])
+	h_id shape after view:  torch.Size([1, 128, 16])
+	h_mo shape after view:  torch.Size([1, 128, 64])
+	h shape after input_attn:  torch.Size([1, 128, 144])
+	h_bg shape after res*res:  torch.Size([1, 128, 8, 8])
+	h_id shape after res*res:  torch.Size([1, 128, 4, 4])
+	h_mo shape after res*res:  torch.Size([1, 128, 8, 8])
+	in loop: 7
+	append h_bg shape:  torch.Size([1, 128, 8, 8])
+	append h_id shape:  torch.Size([1, 128, 4, 4])
+	append h_mo shape:  torch.Size([1, 128, 8, 8])
+
+	h_bg shape after module:  torch.Size([1, 128, 8, 8])
+	h_id shape after module:  torch.Size([1, 128, 4, 4])
+	h_mo shape after module:  torch.Size([1, 128, 8, 8])
+	res, t:  8 4
+	h_bg shape after view:  torch.Size([1, 128, 64])
+	h_id shape after view:  torch.Size([1, 128, 16])
+	h_mo shape after view:  torch.Size([1, 128, 64])
+	h shape after input_attn:  torch.Size([1, 128, 144])
+	h_bg shape after res*res:  torch.Size([1, 128, 8, 8])
+	h_id shape after res*res:  torch.Size([1, 128, 4, 4])
+	h_mo shape after res*res:  torch.Size([1, 128, 8, 8])
+	in loop: 8
+	append h_bg shape:  torch.Size([1, 128, 8, 8])
+	append h_id shape:  torch.Size([1, 128, 4, 4])
+	append h_mo shape:  torch.Size([1, 128, 8, 8])
+
+	h_bg shape after module:  torch.Size([1, 128, 4, 4])
+	h_id shape after module:  torch.Size([1, 128, 2, 2])
+	h_mo shape after module:  torch.Size([1, 128, 4, 4])
+	res, t:  4 2
+	h_bg shape after view:  torch.Size([1, 128, 16])
+	h_id shape after view:  torch.Size([1, 128, 4])
+	h_mo shape after view:  torch.Size([1, 128, 16])
+	h shape after input_attn:  torch.Size([1, 128, 36])
+	h_bg shape after res*res:  torch.Size([1, 128, 4, 4])
+	h_id shape after res*res:  torch.Size([1, 128, 2, 2])
+	h_mo shape after res*res:  torch.Size([1, 128, 4, 4])
+	in loop: 9
+	append h_bg shape:  torch.Size([1, 128, 4, 4])
+	append h_id shape:  torch.Size([1, 128, 2, 2])
+	append h_mo shape:  torch.Size([1, 128, 4, 4])
+
+	h_bg shape after module:  torch.Size([1, 128, 4, 4])
+	h_id shape after module:  torch.Size([1, 128, 2, 2])
+	h_mo shape after module:  torch.Size([1, 128, 4, 4])
+	res, t:  4 2
+	h_bg shape after view:  torch.Size([1, 128, 16])
+	h_id shape after view:  torch.Size([1, 128, 4])
+	h_mo shape after view:  torch.Size([1, 128, 16])
+	h shape after input_attn:  torch.Size([1, 128, 36])
+	h_bg shape after res*res:  torch.Size([1, 128, 4, 4])
+	h_id shape after res*res:  torch.Size([1, 128, 2, 2])
+	h_mo shape after res*res:  torch.Size([1, 128, 4, 4])
+	in loop: 10
+	append h_bg shape:  torch.Size([1, 128, 4, 4])
+	append h_id shape:  torch.Size([1, 128, 2, 2])
+	append h_mo shape:  torch.Size([1, 128, 4, 4])
+
+	h_bg shape after module:  torch.Size([1, 128, 4, 4])
+	h_id shape after module:  torch.Size([1, 128, 2, 2])
+	h_mo shape after module:  torch.Size([1, 128, 4, 4])
+	res, t:  4 2
+	h_bg shape after view:  torch.Size([1, 128, 16])
+	h_id shape after view:  torch.Size([1, 128, 4])
+	h_mo shape after view:  torch.Size([1, 128, 16])
+	h shape after input_attn:  torch.Size([1, 128, 36])
+	h_bg shape after res*res:  torch.Size([1, 128, 4, 4])
+	h_id shape after res*res:  torch.Size([1, 128, 2, 2])
+	h_mo shape after res*res:  torch.Size([1, 128, 4, 4])
+	in loop: 11
+	append h_bg shape:  torch.Size([1, 128, 4, 4])
+	append h_id shape:  torch.Size([1, 128, 2, 2])
+	append h_mo shape:  torch.Size([1, 128, 4, 4])
+
+start up sampling
+cat out h shape:  torch.Size([1, 256, 2304])
+show model_out in p_losses torch.Size([1, 256, 2304])
+[Time 4.960] [Diffusion 1.000487]
