@@ -20,7 +20,8 @@ import random
 import datetime
 
 logger = utils.logger
-def preprocess():
+def preprocess(num_frames=32):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     video_cap = cv2.VideoCapture('testvideo1.avi')
 
     xt = []
@@ -35,7 +36,6 @@ def preprocess():
     logger.debug('xt.shape:', xt.shape, xt.dtype)
 
     # TODO: give 32 frames to encode, first half as condition, second half as inputs
-    num_frames = 32
     start = 0
 
     transform = transforms.Resize((256, 256))
@@ -75,6 +75,13 @@ def preprocess():
     ret_img_id = torch.unsqueeze(ret_img_id, dim=0)
     ret_img_mo = torch.unsqueeze(ret_img_mo, dim=0)
 
+    #change dtype to float16
+    dtype = torch.float32
+    ret_img = ret_img.to(device, dtype=dtype)
+    ret_img_bg = ret_img_bg.to(device, dtype=dtype)
+    ret_img_id = ret_img_id.to(device, dtype=dtype)
+    ret_img_mo = ret_img_mo.to(device, dtype=dtype)
+
     return [ret_img, ret_img_bg, ret_img_id, ret_img_mo]
 
 def play_with_MOSO_VAE():
@@ -82,57 +89,58 @@ def play_with_MOSO_VAE():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logger.debug('in this project, use device: ', device)
 
-    video_cap = cv2.VideoCapture('testvideo1.avi')
-
-    xt = []
-    while True:
-        success, frame = video_cap.read()
-        if not success:
-            break
-        xt.append(frame)
-    xt = np.array(xt)
-    xt = torch.tensor(xt) / 255.0
-    xt = xt.permute(0, 3, 1, 2).to(device)
-    logger.debug('xt.shape:', xt.shape, xt.dtype)
-
-    num_frames = 16
-    start = 0
-
-    transform = transforms.CenterCrop(256)
-
-    lower_bound = 0.2
-    upper_bound = 0.8
-    pre_img = transform(xt[start])
-    nxt_img = transform(xt[start + 1])
-
-    logger.debug('pre_img.shape:', pre_img.shape)
-    logger.debug('nxt_img.shape:', nxt_img.shape)
-    imgs, imgs_bg, imgs_id, imgs_mo = [], [], [], []
-
-    for i in range(start + 2, start + 2 + num_frames):
-        cur_img = nxt_img
-        nxt_img = transform(xt[i])
-
-        cur_diff = cur_img * 2 - pre_img - nxt_img
-        max_diff = torch.max(torch.abs(cur_diff), dim=0)[0]
-        id_mask = (max_diff > lower_bound) & (max_diff <= upper_bound)
-        img_id = id_mask[None, :, :] * cur_img
-        img_bg = cur_img - img_id
-
-        imgs.append(cur_img.unsqueeze(0))
-        imgs_bg.append(img_bg.unsqueeze(0))
-        imgs_id.append(img_id.unsqueeze(0))
-        imgs_mo.append(cur_diff.unsqueeze(0))
-
-    ret_img = torch.cat(imgs, dim=0)
-    ret_img_bg = torch.cat(imgs_bg, dim=0)
-    ret_img_id = torch.cat(imgs_id, dim=0)
-    ret_img_mo = torch.cat(imgs_mo, dim=0)
-
-    ret_img = torch.unsqueeze(ret_img, dim=0).to(device)
-    ret_img_bg = torch.unsqueeze(ret_img_bg, dim=0).to(device)
-    ret_img_id = torch.unsqueeze(ret_img_id, dim=0).to(device)
-    ret_img_mo = torch.unsqueeze(ret_img_mo, dim=0).to(device)
+    # video_cap = cv2.VideoCapture('testvideo1.avi')
+    #
+    # xt = []
+    # while True:
+    #     success, frame = video_cap.read()
+    #     if not success:
+    #         break
+    #     xt.append(frame)
+    # xt = np.array(xt)
+    # xt = torch.tensor(xt) / 255.0
+    # xt = xt.permute(0, 3, 1, 2).to(device)
+    # logger.debug('xt.shape:', xt.shape, xt.dtype)
+    #
+    # num_frames = 16
+    # start = 0
+    #
+    # transform = transforms.CenterCrop(256)
+    #
+    # lower_bound = 0.2
+    # upper_bound = 0.8
+    # pre_img = transform(xt[start])
+    # nxt_img = transform(xt[start + 1])
+    #
+    # logger.debug('pre_img.shape:', pre_img.shape)
+    # logger.debug('nxt_img.shape:', nxt_img.shape)
+    # imgs, imgs_bg, imgs_id, imgs_mo = [], [], [], []
+    #
+    # for i in range(start + 2, start + 2 + num_frames):
+    #     cur_img = nxt_img
+    #     nxt_img = transform(xt[i])
+    #
+    #     cur_diff = cur_img * 2 - pre_img - nxt_img
+    #     max_diff = torch.max(torch.abs(cur_diff), dim=0)[0]
+    #     id_mask = (max_diff > lower_bound) & (max_diff <= upper_bound)
+    #     img_id = id_mask[None, :, :] * cur_img
+    #     img_bg = cur_img - img_id
+    #
+    #     imgs.append(cur_img.unsqueeze(0))
+    #     imgs_bg.append(img_bg.unsqueeze(0))
+    #     imgs_id.append(img_id.unsqueeze(0))
+    #     imgs_mo.append(cur_diff.unsqueeze(0))
+    #
+    # ret_img = torch.cat(imgs, dim=0)
+    # ret_img_bg = torch.cat(imgs_bg, dim=0)
+    # ret_img_id = torch.cat(imgs_id, dim=0)
+    # ret_img_mo = torch.cat(imgs_mo, dim=0)
+    #
+    # ret_img = torch.unsqueeze(ret_img, dim=0).to(device)
+    # ret_img_bg = torch.unsqueeze(ret_img_bg, dim=0).to(device)
+    # ret_img_id = torch.unsqueeze(ret_img_id, dim=0).to(device)
+    # ret_img_mo = torch.unsqueeze(ret_img_mo, dim=0).to(device)
+    ret_img, ret_img_bg, ret_img_id, ret_img_mo = preprocess(16)
 
     logger.debug('ret_img.shape:', ret_img.shape)
     logger.debug('ret_img_bg.shape:', ret_img_bg.shape)
@@ -268,6 +276,7 @@ def play_with_all_process():
         # Now for quantized
 
         x = x.to(device)
+        x = x.repeat(3, 1, 1, 1, 1, 1)
 
         batch_size = x.shape[0]
         x = rearrange(x, 'b d t c h w -> b d t c h w')
@@ -312,29 +321,40 @@ def play_with_all_process():
                         # bg_toks, id_toks, mo_toks = first_stage_model.my_encode([ret_img, ret_img_bg, ret_img_id, ret_img_mo], is_training=False)
 
                         # test extract token here
-                        # ex_tok = False
+                        ex_tok = True
                         # if ex_tok:
                         #     inputs = x_img, x_bg, x_id, x_mo
-                        #     bg_toks, id_toks, mo_toks = first_stage_model.extract_tokens(inputs, is_training=False)
-                        #     logger.debug('output: ')
-                        #     logger.debug('bg_toks.shape: ', bg_toks.shape, bg_toks.dtype)
-                        #     logger.debug('id_toks.shape: ', id_toks.shape, id_toks.dtype)
-                        #     logger.debug('mo_toks.shape: ', mo_toks.shape, mo_toks.dtype)
+                        #     first_stage_model._generater(inputs, is_training=False)
                         #
                         #     return
 
                         # Keep number of frames of x and c the same, now 5
 
-                        xbg_quantized, xid_quantized, xmo_quantized = first_stage_model.my_encode([x_img, x_bg, x_id, x_mo], is_training=False)
-                        cbg_quantized, cid_quantized, cmo_quantized = first_stage_model.my_encode([c_img, c_bg, c_id, c_mo], is_training=False)
+                        xbg_toks, xid_toks, xmo_toks = first_stage_model.extract_tokens([x_img, x_bg, x_id, x_mo], is_training=False)
+                        cbg_toks, cid_toks, cmo_toks = first_stage_model.extract_tokens([c_img, c_bg, c_id, c_mo], is_training=False)
+                        logger.debug('xbg_toks.shape: ', xbg_toks.shape)
+                        logger.debug('xid_toks.shape: ', xid_toks.shape)
+                        logger.debug('xmo_toks.shape: ', xmo_toks.shape)
+                        #
+                        xbg_quantized, xid_quantized, xmo_quantized = first_stage_model.get_quantized_by_tokens(xbg_toks, xid_toks, xmo_toks)
+                        cbg_quantized, cid_quantized, cmo_quantized = first_stage_model.get_quantized_by_tokens(cbg_toks, cid_toks, cmo_toks)
+
+                        # xbg_quantized, xid_quantized, xmo_quantized = first_stage_model.my_encode([x_img, x_bg, x_id, x_mo], is_training=False)
+                        # cbg_quantized, cid_quantized, cmo_quantized = first_stage_model.my_encode([c_img, c_bg, c_id, c_mo], is_training=False)
                         # xbg_quantized, xid_quantized, xmo_quantized = first_stage_model.extract_tokens([x_img, x_bg, x_id, x_mo], is_training=False)
                         # cbg_quantized, cid_quantized, cmo_quantized = first_stage_model.extract_tokens([c_img, c_bg, c_id, c_mo], is_training=False)
 
 
 
-                        logger.debug('cbg_quantized.shape: ', cbg_quantized.shape, cbg_quantized.dtype)
-                        logger.debug('cid_quantized.shape: ', cid_quantized.shape, cbg_quantized.dtype)
-                        logger.debug('cmo_quantized.shape: ', cmo_quantized.shape, cbg_quantized.dtype)
+                        logger.debug('xbg_quantized.shape: ', xbg_quantized.shape, xbg_quantized.dtype)
+                        logger.debug('xid_quantized.shape: ', xid_quantized.shape, xbg_quantized.dtype)
+                        logger.debug('xmo_quantized.shape: ', xmo_quantized.shape, xbg_quantized.dtype)
+
+                        # output = first_stage_model._decoder(xbg_quantized, xid_quantized, xmo_quantized)[0]
+                        # if output != None:
+                        #     print('decode the output: ', output.shape)
+                        #     return
+
 
                         # t = 1
 
@@ -383,7 +403,7 @@ def play_with_all_process():
                         c = torch.zeros_like(z).to(device)
             logger.debug('show z.shape: ', z.shape)
             logger.debug('show c.shape: ', c.shape)
-            (loss, t), loss_dict = criterion(z.float(), c.float())
+            (loss, t, output), loss_dict = criterion(z.float(), c.float())
 
         else:
             if it == 0:
@@ -392,7 +412,7 @@ def play_with_all_process():
                 with torch.no_grad():
                     z = first_stage_model.module.extract(x).detach()
 
-            (loss, t), loss_dict = criterion(z.float())
+            (loss, t, output), loss_dict = criterion(z.float())
 
         """
         scaler.scale(loss).backward()
@@ -403,6 +423,27 @@ def play_with_all_process():
         opt.step()
 
         losses['diffusion_loss'].update(loss.item(), 1)
+        # print('show diffusion model output: ', output.shape)
+        # out_bg, out_id, out_mo = utils.convert_latent_to_quantized(output, 3, 4, 5, 256, 16)
+        # #
+        # print('show out_bg: ', out_bg.shape)
+        # print('show out_id: ', out_id.shape)
+        # print('show out_mo: ', out_mo.shape)
+        #
+        # out_bg = rearrange(out_bg, 'b c (t h w) -> b t c h w', t=1, h=32, w=32)
+        # out_id = rearrange(out_id, 'b c (t h w) -> b t c h w', t=1, h=16, w=16)
+        # out_mo = rearrange(out_mo, 'b c (t h w) -> b t c h w', t=16, h=8, w=8)
+        #
+        # print('after rearrange out_bg: ', out_bg.shape)
+        # print('after rearrange out_id: ', out_id.shape)
+        # print('after rearrange out_mo: ', out_mo.shape)
+
+        # recon = first_stage_model._decoder(out_bg, out_id, out_mo)[0]
+        # print('show vae recon: ', recon.shape)
+        # output = first_stage_model._decoder(xbg_quantized, xid_quantized, xmo_quantized)[0]
+        # if output != None:
+        #     print('decode the output: ', output.shape)
+        #     return
 
         # ema model
         if it % 25 == 0 and it > 0:
@@ -434,25 +475,120 @@ def play_with_all_process():
 
 def play_with_diffusion_train():
 
-    train_datalodaer = None
 
-    vqvae = None # load from pretrained
+
+    scaler = GradScaler()
+
+    rank = 0
+    ema_model = None
+    cond_prob = 0.3
+
+    unet_path = './config/small_unet.yaml'
+    ldm_path = './config/ldm_base.yaml'
+    unet_config = OmegaConf.load(unet_path).unet_config
+    # unet_config = OmegaConf.load(ldm_path).model.params.unet_config
+    logger.debug(unet_config)
+    logger.debug('cuda: ', torch.torch.cuda.device_count())
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    logger.debug('in this project, use device: ', device)
+    video_x = torch.randn(5, 4, 2048).to(device)
+    timesteps = torch.tensor([0, 1, 2, 3, 4]).to(device)
+    unet = UNetModel(**unet_config).to(device)
+    model = DiffusionWrapper(model=unet, conditioning_key=None).to(device)
+
+    moso_opt = yaml.load(open('config/vqvae_raw.yaml', 'r'), Loader=yaml.FullLoader)
+    moso_model_opt = moso_opt['model']
+
+    # TODO: load pretrained vqvae from checkpoint
+    vqvae = VQVAEModel(moso_model_opt, moso_opt).to(device)
+
+    linear_start = 0.0015
+    linear_end = 0.0195
+    log_every_t = 200
+    w = 0.0
+
+    criterion = DDPM(model,
+         channels=unet_config.in_channels,
+         image_size=unet_config.image_size,
+         linear_start=linear_start,
+         linear_end=linear_end,
+         log_every_t=log_every_t,
+         w=w,
+         ).to(device)
+
+    if logger is None:
+        log_ = print
+    else:
+        log_ = logger.log
+
+    # if rank == 0:
+    #     rootdir = logger.logdir
+
+
+    # device = torch.device('cuda', rank)
+
+    losses = dict()
+    losses['diffusion_loss'] = AverageMeter()
+    check = time.time()
+
+    # lr_scheduler = LambdaLR(opt, scheduler)
+    if ema_model == None:
+        ema_model = copy.deepcopy(model)
+        ema = LitEma(ema_model)
+        ema_model.eval()
+    else:
+        ema = LitEma(ema_model)
+        ema.num_updates = torch.tensor(11200, dtype=torch.int)
+        ema_model.eval()
+
+    opt = torch.optim.Adam(model.parameters(), lr=1e-4)
+    vqvae.eval()
+    model.train()
+
+
+    # TODO: load the tokens from the dataset generated by the vqvae
+    # each piece of data is a list of batched bg, id, mo tokens
+    # bg tok shape: [batch, 32, 32]
+    # id tok shape: [batch, 16, 16]
+    # mo tok shape: [(batch * n_frames), 8, 8]
+    bg_shape = (3, 32, 32)
+    id_shape = (3, 16, 16)
+    mo_shape = (48, 8, 8)
+    train_loader = [
+        [
+            torch.randn(bg_shape),
+            torch.randn(id_shape),
+            torch.randn(mo_shape)
+        ]
+                ]
 
     # TODO: finish the training code
+    num_epochs = 100
+    for epoch in range(num_epochs):
+
+        for it, data in enumerate(train_loader):
+            bg_toks, id_toks, mo_toks = data
+            bg_toks = bg_toks.to(device)
+            id_toks = id_toks.to(device)
+            mo_toks = mo_toks.to(device)
+
+            with torch.no_grad():
+                bg_quantized, id_quantized, mo_quantized = vqvae.get_quantized_by_tokens(bg_toks, id_toks, mo_toks)
+
+
+
 
 if __name__ == '__main__':
     # play_with_MOSO_VAE()
 
-    # background token shape: [batch, 1, 128, 8, 8]
-    #     object token shape: [batch, 1, 128, 4, 4]
-    #     motion token shape: [batch, n_frames, 128, 2, 2]
-
-    # bg_toks = torch.randn(1, 1, 128, 8, 8)
-    # id_toks = torch.randn(1, 1, 128, 4, 4)
-    # mo_toks = torch.randn(1, 5, 128, 2, 2)
-
     # play_with_PVDM_Diffuser()
 
     play_with_all_process()
+    # import glob
 
-
+    # data_list = glob.glob('./data/*.npy')
+    # for data_path in data_list:
+    #     dt = np.load(data_path, allow_pickle=True).item()
+    #     for key in dt:
+    #         print(key+':', torch.from_numpy(dt[key]).shape)
+    #     print('---------------------')

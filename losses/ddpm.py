@@ -390,7 +390,7 @@ class DDPM(nn.Module):
 
         loss_dict.update({f'{log_prefix}/loss': loss})
 
-        return loss, loss_dict
+        return loss, loss_dict, model_out
 
     def forward(self, x, cond=None, *args, **kwargs):
         # b, c, h, w, device, img_size, = *x.shape, x.device, self.image_size

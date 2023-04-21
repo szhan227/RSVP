@@ -911,15 +911,23 @@ class UNetModel(nn.Module):
             h = torch.cat([h, self.zeros.repeat(h.size(0), 1, 1)], dim=1)
 
         logger.debug('h shape: ', h.shape)
-        logger.debug('zeros shape: ', self.zeros.repeat(h.size(0), 1, 1).shape)
+        # logger.debug('zeros shape: ', self.zeros.repeat(h.size(0), 1, 1).shape)
         # TODO: treat 32 and 16 as variables
 
         # h_bg = h[:, :, 0:32*32].view(h.size(0), h.size(1), 32, 32)
         # h_id = h[:, :, 32*32:32*(32+16)].view(h.size(0), h.size(1), 16, 32)
         # h_mo = h[:, :, 32*(32+16):32*(32+16+16)].view(h.size(0), h.size(1), 16, 32)
-        h_bg = h[:, :, :32 * 32].view(h.size(0), h.size(1), 32, 32)
-        h_id = h[:, :, 32 * 32: 32 * 32 + 16 * 16].view(h.size(0), h.size(1), 16, 16)
-        h_mo = h[:, :, 32 * 32 + 16 * 16:32 * 32 + 16 * 16 + 32 * 32].view(h.size(0), h.size(1), 32, 32)
+        bg_len = 32
+        id_len = 16
+        mo_len = 32
+        # h_bg = h[:, :, :32 * 32].view(h.size(0), h.size(1), 32, 32)
+        # h_id = h[:, :, 32 * 32: 32 * 32 + 16 * 16].view(h.size(0), h.size(1), 16, 16)
+        # h_mo = h[:, :, 32 * 32 + 16 * 16:32 * 32 + 16 * 16 + 32 * 32].view(h.size(0), h.size(1), 32, 32)
+
+        h_bg, h_id, h_mo = h.split([bg_len ** 2, id_len ** 2, mo_len ** 2], dim=2)
+        h_bg = h_bg.view(h.size(0), h.size(1), bg_len, bg_len)
+        h_id = h_id.view(h.size(0), h.size(1), id_len, id_len)
+        h_mo = h_mo.view(h.size(0), h.size(1), mo_len, mo_len)
         # h_bg, h_id, h_mo = torch.chunk(h, 3, dim=-1)
 
         # trial: reconstruct hc and hx based on only 1 frame for bg and id
@@ -1008,9 +1016,15 @@ class UNetModel(nn.Module):
         h = torch.cat([h_bg, h_id, h_mo], dim=-1)
         h = self.mid_attn(h)
 
-        h_bg = h[:, :, :res * res].view(h.size(0), h.size(1), res, res)
-        h_id = h[:, :, res * res:res * res + t * t].view(h.size(0), h.size(1), t, t)
-        h_mo = h[:, :, res * res + t * t:res * res + t * t + res * res].view(h.size(0), h.size(1), res, res)
+        print('h shape after mid_attn: ', h.shape)
+        # h_bg = h[:, :, :res * res].view(h.size(0), h.size(1), res, res)
+        # h_id = h[:, :, res * res:res * res + t * t].view(h.size(0), h.size(1), t, t)
+        # h_mo = h[:, :, res * res + t * t:res * res + t * t + res * res].view(h.size(0), h.size(1), res, res)
+
+        h_bg, h_id, h_mo = h.split([res ** 2, t ** 2, res ** 2], dim=2)
+        h_bg = h_bg.view(h.size(0), h.size(1), res, res)
+        h_id = h_id.view(h.size(0), h.size(1), t, t)
+        h_mo = h_mo.view(h.size(0), h.size(1), res, res)
 
         logger.debug('start up sampling')
         for module, output_attn in zip(self.output_blocks, self.output_attns):
@@ -1033,9 +1047,13 @@ class UNetModel(nn.Module):
             h = torch.cat([h_bg, h_id, h_mo], dim=-1)
             h = output_attn(h)
 
-            h_bg = h[:, :, :res*res].view(h.size(0), h.size(1), res, res)
-            h_id = h[:, :, res*res:res*res + t*t].view(h.size(0), h.size(1), t, t)
-            h_mo = h[:, :, res*res+t*t:res*res+t*t + res * res].view(h.size(0), h.size(1), res, res)
+            # h_bg = h[:, :, :res*res].view(h.size(0), h.size(1), res, res)
+            # h_id = h[:, :, res*res:res*res + t*t].view(h.size(0), h.size(1), t, t)
+            # h_mo = h[:, :, res*res+t*t:res*res+t*t + res * res].view(h.size(0), h.size(1), res, res)
+            h_bg, h_id, h_mo = h.split([res ** 2, t ** 2, res ** 2], dim=2)
+            h_bg = h_bg.view(h.size(0), h.size(1), res, res)
+            h_id = h_id.view(h.size(0), h.size(1), t, t)
+            h_mo = h_mo.view(h.size(0), h.size(1), res, res)
             # logger.debug('\tappend h_bg shape: ', h_bg.shape)
             # logger.debug('\tappend h_id shape: ', h_id.shape)
             # logger.debug('\tappend h_mo shape: ', h_mo.shape)

@@ -11,6 +11,8 @@ from torch.utils.tensorboard import SummaryWriter
 import gdown
 import time
 
+from einops import rearrange
+
 
 class Logger(object):
     """Reference: https://gist.github.com/gyglim/1f8dfb1b5c82627ae3efcfbbadb9f514"""
@@ -205,6 +207,24 @@ def make_mixed_pairs(l, t1, t2, given_vid_real, given_vid_fake):
 
     return torch.cat([ret_frame1, ret_frame2, dt], dim=1)
 
+
+
+def convert_latent_to_quantized(z, ds_b, ds_i, ds_m, hidden_sz, num_frames):
+    # z shape: [B, hidden_sz, xxx]
+    # in our case hidden_sz = 256
+    hbg = wbg = hidden_sz // 2**ds_b
+    hig = wig = hidden_sz // 2**ds_i
+    hmo = wmo = hidden_sz // 2**ds_m
+
+    tbg = tid = 1
+    tmo = num_frames
+    z_bg, z_ig, z_mo = torch.split(z, [hbg*wbg, hig*wig, hmo*wmo*num_frames], dim=-1)
+
+    bg_quantized = rearrange(z_bg, 'b c (t h w) -> b t c h w', t=tbg, h=hbg, w=wbg)
+    ig_quantized = rearrange(z_ig, 'b c (t h w) -> b t c h w', t=tid, h=hig, w=wig)
+    mo_quantized = rearrange(z_mo, 'b c (t h w) -> b t c h w', t=tmo, h=hmo, w=wmo)
+
+    return bg_quantized, ig_quantized, mo_quantized
 
 global logger
 msg_level = 'debug'

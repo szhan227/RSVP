@@ -1,0 +1,31 @@
+!!!!!!!!!!! time head: 16 !!!!!!!!!!!!!
+!!! ABS_weight: 1.0
+!!! MSE_weight: 0
+!!! SSIM_weight: 0
+contructing model...
+ds_background:  3
+num_hiddens:  256
+num_residual_layers:  4
+num_residual_hiddens:  128
+suf_method:  conv
+n_frames:  16
+Loading Motion Encoder: Encoder_Motion...
+{'image_size': 32, 'in_channels': 256, 'out_channels': 256, 'model_channels': 32, 'attention_resolutions': [4, 2, 1], 'num_res_blocks': 2, 'channel_mult': [1, 2, 4, 4], 'num_heads': 8, 'use_scale_shift_norm': True, 'resblock_updown': True, 'cond_model': True}
+before loop:
+num of input blocks: 1
+num of input attns: 1
+DDPM: Running in eps-prediction mode
+show encoding indices: torch.Size([2048])
+show encodings: torch.Size([2048, 24576])
+show encoding indices: torch.Size([512])
+show encodings: torch.Size([512, 24576])
+show encoding indices: torch.Size([2048])
+show encodings: torch.Size([2048, 24576])
+bg_quantized torch.Size([2, 1, 256, 32, 32])
+id_quantized torch.Size([2, 1, 256, 16, 16])
+mo_quantized torch.Size([2, 16, 256, 8, 8])
+after rearrange quantized
+xbg_quantized torch.Size([2, 256, 1024])
+xid_quantized torch.Size([2, 256, 256])
+xmo_quantized torch.Size([2, 256, 1024])
+show z shape torch.Size([2, 256, 2304])

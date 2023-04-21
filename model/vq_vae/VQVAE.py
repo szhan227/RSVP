@@ -246,17 +246,17 @@ class VQVAEModel(nn.Module):
         vq_output_id = self._vq_ema(feat_id, is_training=is_training)
         vq_output_mo = self._vq_ema(feat_mo, is_training=is_training)
 
-        # logger.debug('vq_output_bg')
-        # for key in vq_output_bg:
-        #     logger.debug(key, vq_output_bg[key].shape, vq_output_bg[key].dtype)
-        #
-        # logger.debug('vq_output_id')
-        # for key in vq_output_id:
-        #     logger.debug(key, vq_output_id[key].shape, vq_output_id[key].dtype)
-        #
-        # logger.debug('vq_output_mo')
-        # for key in vq_output_mo:
-        #     logger.debug(key, vq_output_mo[key].shape, vq_output_mo[key].dtype)
+        logger.debug('vq_output_bg')
+        for key in vq_output_bg:
+            logger.debug(key, vq_output_bg[key].shape, vq_output_bg[key].dtype)
+
+        logger.debug('vq_output_id')
+        for key in vq_output_id:
+            logger.debug(key, vq_output_id[key].shape, vq_output_id[key].dtype)
+
+        logger.debug('vq_output_mo')
+        for key in vq_output_mo:
+            logger.debug(key, vq_output_mo[key].shape, vq_output_mo[key].dtype)
 
         quantize_bg = self._suf_vq_bg(vq_output_bg['quantize'])
         quantize_id = self._suf_vq_id(vq_output_id['quantize'])
@@ -390,7 +390,7 @@ class VQVAEModel(nn.Module):
 
     def extract_tokens(self, batch, is_training):
         x, xbg, xid, xmo = batch
-        B, _, _, _, _ = xbg.shape
+        B, T, _, _, _ = xmo.shape
 
         # these three encoders will generate different shpae, now :
         # bg: 128, 8, 8
@@ -419,6 +419,10 @@ class VQVAEModel(nn.Module):
         bg_tokens = vq_output_bg['encoding_indices']
         id_tokens = vq_output_id['encoding_indices']
         mo_tokens = vq_output_mo['encoding_indices']
+
+        bg_tokens = rearrange(bg_tokens, "(b t) h w -> b t h w", b=B)
+        id_tokens = rearrange(id_tokens, "(b t) h w -> b t h w", b=B)
+        mo_tokens = rearrange(mo_tokens, "(b t) h w -> b t h w", b=B)
 
         return bg_tokens, id_tokens, mo_tokens
 
