@@ -514,7 +514,10 @@ class UNetModel(nn.Module):
         out_channels,
         num_res_blocks,
         attention_resolutions,
-        # num_frames,
+        ds_bg,
+        ds_id,
+        ds_mo,
+        vae_hidden,
         dropout=0,
         channel_mult=(1, 2, 4, 8),
         conv_resample=True,
@@ -575,6 +578,10 @@ class UNetModel(nn.Module):
         if cond_model:
             self.register_buffer("zeros", torch.zeros(1, self.in_channels, 2048))
 
+        self.ds_bg = ds_bg
+        self.ds_id = ds_id
+        self.ds_mo = ds_mo
+        self.vae_hidden = vae_hidden
 
         time_embed_dim = model_channels * 4
         self.time_embed = nn.Sequential(
@@ -883,6 +890,8 @@ class UNetModel(nn.Module):
         :param y: an [N] Tensor of labels, if class-conditional.
         :return: an [N x C x ...] Tensor of outputs.
         """
+
+        logger.info('show timesteps: ', timesteps, timesteps.shape)
         assert (y is not None) == (
             self.num_classes is not None
         ), "must specify y if and only if the model is class-conditional"
@@ -917,9 +926,9 @@ class UNetModel(nn.Module):
         # h_bg = h[:, :, 0:32*32].view(h.size(0), h.size(1), 32, 32)
         # h_id = h[:, :, 32*32:32*(32+16)].view(h.size(0), h.size(1), 16, 32)
         # h_mo = h[:, :, 32*(32+16):32*(32+16+16)].view(h.size(0), h.size(1), 16, 32)
-        bg_len = 32
-        id_len = 16
-        mo_len = 32
+        bg_len = self.vae_hidden // 2 ** self.ds_bg  # 256 // 8 = 32
+        id_len = self.vae_hidden // 2 ** self.ds_id  # 256 // 16 = 16
+        mo_len = int(math.sqrt(h.size(-1) - bg_len ** 2 - id_len ** 2))  # 32
         # h_bg = h[:, :, :32 * 32].view(h.size(0), h.size(1), 32, 32)
         # h_id = h[:, :, 32 * 32: 32 * 32 + 16 * 16].view(h.size(0), h.size(1), 16, 16)
         # h_mo = h[:, :, 32 * 32 + 16 * 16:32 * 32 + 16 * 16 + 32 * 32].view(h.size(0), h.size(1), 32, 32)
@@ -1016,7 +1025,6 @@ class UNetModel(nn.Module):
         h = torch.cat([h_bg, h_id, h_mo], dim=-1)
         h = self.mid_attn(h)
 
-        print('h shape after mid_attn: ', h.shape)
         # h_bg = h[:, :, :res * res].view(h.size(0), h.size(1), res, res)
         # h_id = h[:, :, res * res:res * res + t * t].view(h.size(0), h.size(1), t, t)
         # h_mo = h[:, :, res * res + t * t:res * res + t * t + res * res].view(h.size(0), h.size(1), res, res)

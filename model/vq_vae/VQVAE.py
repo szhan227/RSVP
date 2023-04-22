@@ -443,6 +443,23 @@ class VQVAEModel(nn.Module):
 
         return quantized_bg, quantized_id, quantized_mo
 
+    def convert_latent_to_quantized(self, z, ds_b, ds_i, ds_m, hidden_sz, num_frames):
+        # z shape: [B, hidden_sz, xxx]
+        # in our case hidden_sz = 256
+        hbg = wbg = hidden_sz // 2 ** ds_b
+        hig = wig = hidden_sz // 2 ** ds_i
+        hmo = wmo = hidden_sz // 2 ** ds_m
+
+        tbg = tid = 1
+        tmo = num_frames
+        z_bg, z_ig, z_mo = torch.split(z, [hbg * wbg, hig * wig, hmo * wmo * num_frames], dim=-1)
+
+        bg_quantized = rearrange(z_bg, 'b c (t h w) -> b t c h w', t=tbg, h=hbg, w=wbg)
+        ig_quantized = rearrange(z_ig, 'b c (t h w) -> b t c h w', t=tid, h=hig, w=wig)
+        mo_quantized = rearrange(z_mo, 'b c (t h w) -> b t c h w', t=tmo, h=hmo, w=wmo)
+
+        return bg_quantized, ig_quantized, mo_quantized
+
     def calculate_adaptive_weight(self, nll_loss, g_loss, last_layer):
         nll_grads = torch.autograd.grad(nll_loss, last_layer, retain_graph=True)[0]
         g_grads = torch.autograd.grad(g_loss, last_layer, retain_graph=True)[0]

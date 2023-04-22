@@ -7,6 +7,8 @@ from model.vq_vae.ResidualStack import ResidualStack_UP, ResidualStack
 from model.vq_vae.MergeModule import MergeModule, MergeModule_simple
 from model.vq_vae.Attentions import PatchwiseAttention
 from model.vq_vae.Attentions import MultiHeadAttention
+import utils
+logger = utils.logger
 
 class Decoder(nn.Module):
     def __init__(self, num_hiddens, num_residual_layers, num_residual_hiddens,
@@ -35,8 +37,8 @@ class Decoder(nn.Module):
             self.pre_up_bg = nn.Upsample(scale_factor=2**(ds_background-ds_content),
                                          mode='bilinear', align_corners=True)
 
-        print("WARNING: pre_up_bg: ", self.pre_up_bg)
-        print("WARNING: pre_up_id: ", self.pre_up_id)
+        logger.debug("WARNING: pre_up_bg: ", self.pre_up_bg)
+        logger.debug("WARNING: pre_up_id: ", self.pre_up_id)
 
         # Step 2: Merge feat_bg, feat_id according to feat_m
         self.merge = MergeModule(d_model=num_hiddens,

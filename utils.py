@@ -17,11 +17,12 @@ from einops import rearrange
 class Logger(object):
     """Reference: https://gist.github.com/gyglim/1f8dfb1b5c82627ae3efcfbbadb9f514"""
 
-    def __init__(self, fn, ask=True, level='debug'):
+    def __init__(self, fn=None, ask=True, level='debug'):
         self.level = level
         if not os.path.exists("./results/"):
             os.mkdir("./results/")
-
+        if fn is None:
+            fn = f'log_{self.level}_{datetime.now().strftime("%y%m%d_%H%M%S")}'
         logdir = self._make_dir(fn)
         if not os.path.exists(logdir):
             os.mkdir(logdir)
@@ -45,33 +46,36 @@ class Logger(object):
         self.writer = SummaryWriter(logdir)
         self.log_file = open(os.path.join(logdir, log_fn), 'a')
 
-    def log(self, *args):
+    def set_level(self, level):
+        self.level = level
+
+    def log(self, *args, **kwargs):
         # self.log_file.write('[%s] %s' % (datetime.now(), string) + '\n')
         self.log_file.write(' '.join([str(arg) for arg in args]) + '\n')
         self.log_file.flush()
         # print('[%s] %s' % (datetime.now(), string))
-        print(datetime.now(), *args)
+        print(datetime.now(), *args, **kwargs)
         sys.stdout.flush()
 
-    def debug(self, *args):
+    def debug(self, *args, **kwargs):
         if self.levels[self.level] <= self.levels['debug']:
-            self.log(*args)
+            self.log(*args, **kwargs)
 
-    def info(self, *args):
+    def info(self, *args, **kwargs):
         if self.levels[self.level] <= self.levels['info']:
-            self.log(*args)
+            self.log(*args, **kwargs)
 
-    def warning(self, *args):
+    def warning(self, *args, **kwargs):
         if self.levels[self.level] <= self.levels['warning']:
-            self.log(*args)
+            self.log(*args, **kwargs)
 
-    def error(self, *args):
+    def error(self, *args, **kwargs):
         if self.levels[self.level] <= self.levels['error']:
-            self.log(*args)
+            self.log(*args, **kwargs)
 
-    def critical(self, *args):
+    def critical(self, *args, **kwargs):
         if self.levels[self.level] <= self.levels['critical']:
-            self.log(*args)
+            self.log(*args, **kwargs)
 
     def log_dirname(self, string):
         self.log_file.write('%s (%s)' % (string, self.logdir) + '\n')
@@ -209,24 +213,8 @@ def make_mixed_pairs(l, t1, t2, given_vid_real, given_vid_fake):
 
 
 
-def convert_latent_to_quantized(z, ds_b, ds_i, ds_m, hidden_sz, num_frames):
-    # z shape: [B, hidden_sz, xxx]
-    # in our case hidden_sz = 256
-    hbg = wbg = hidden_sz // 2**ds_b
-    hig = wig = hidden_sz // 2**ds_i
-    hmo = wmo = hidden_sz // 2**ds_m
-
-    tbg = tid = 1
-    tmo = num_frames
-    z_bg, z_ig, z_mo = torch.split(z, [hbg*wbg, hig*wig, hmo*wmo*num_frames], dim=-1)
-
-    bg_quantized = rearrange(z_bg, 'b c (t h w) -> b t c h w', t=tbg, h=hbg, w=wbg)
-    ig_quantized = rearrange(z_ig, 'b c (t h w) -> b t c h w', t=tid, h=hig, w=wig)
-    mo_quantized = rearrange(z_mo, 'b c (t h w) -> b t c h w', t=tmo, h=hmo, w=wmo)
-
-    return bg_quantized, ig_quantized, mo_quantized
 
 global logger
 msg_level = 'debug'
-logger = Logger(f'log_{msg_level}_{time.time()}', level=msg_level)
+logger = Logger(level=msg_level)
 

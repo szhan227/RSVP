@@ -21,6 +21,10 @@ from torchvision.utils import make_grid
 from inspect import isfunction
 import torch.nn.functional as F
 
+import utils
+
+logger = utils.logger
+
 def noise_like(shape, device, repeat=False):
     repeat_noise = lambda: torch.randn((1, *shape[1:]), device=device).repeat(shape[0], *((1,) * (len(shape) - 1)))
     noise = lambda: torch.randn(shape, device=device)
@@ -110,7 +114,7 @@ class DDPM(nn.Module):
         super().__init__()
         assert parameterization in ["eps", "x0"], 'currently only supporting "eps" and "x0"'
         self.parameterization = parameterization
-        print(f"{self.__class__.__name__}: Running in {self.parameterization}-prediction mode")
+        logger.info(f"{self.__class__.__name__}: Running in {self.parameterization}-prediction mode")
         self.cond_stage_model = None
         self.clip_denoised = clip_denoised
         self.log_every_t = log_every_t
@@ -216,7 +220,7 @@ class DDPM(nn.Module):
                 extract_into_tensor(self.sqrt_recip_alphas_cumprod, t, x_t.shape) * x_t -
                 extract_into_tensor(self.sqrt_recipm1_alphas_cumprod, t, x_t.shape) * noise
         )
-    
+
     def predict_noise_from_start(self, x_t, t, x0):
         return (
             (extract_into_tensor(self.sqrt_recip_alphas_cumprod, t, x_t.shape) * x_t - x0) / \
@@ -267,14 +271,14 @@ class DDPM(nn.Module):
         if return_intermediates:
             return img, intermediates
         return img
-    
+
 
     def model_predictions(self, x, cond, t, x_self_cond = None, clip_x_start = False):
         if cond == None:
             model_output = self.model(x, cond, t, x_self_cond)
         else:
             model_output = (1+self.w) * self.model(x, cond, t, x_self_cond) - self.w * self.model(x, cond*0, t, x_self_cond)
-        
+
         if self.parameterization == 'eps':
             pred_noise = model_output
             x_start = self.predict_start_from_noise(x, t, pred_noise)
@@ -360,10 +364,11 @@ class DDPM(nn.Module):
         return loss
 
     def p_losses(self, x_start, cond, t, noise=None):
+        logger.debug('show t in p_losses:', t, t.shape)
         noise = default(noise, lambda: torch.randn_like(x_start))
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
         model_out = self.model(x_noisy, cond, t)
-
+        logger.debug('show model_out in p_losses', model_out.shape)
         loss_dict = {}
         if self.parameterization == "eps":
             target = noise
@@ -386,7 +391,7 @@ class DDPM(nn.Module):
 
         loss_dict.update({f'{log_prefix}/loss': loss})
 
-        return loss, loss_dict
+        return loss, loss_dict, model_out
 
     def forward(self, x, cond=None, *args, **kwargs):
         # b, c, h, w, device, img_size, = *x.shape, x.device, self.image_size

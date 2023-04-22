@@ -8,7 +8,7 @@ import utils
 from model.vq_vae.VQVAE import VQVAEModel
 from model.ldm.unet import UNetModel, DiffusionWrapper
 from model.ema import LitEma
-from losses.ddpm import DDPM
+from model.ldm.ddpm import DDPM
 from omegaconf import OmegaConf
 from torch.cuda.amp import GradScaler, autocast
 import time
@@ -16,7 +16,7 @@ from utils import AverageMeter, Logger
 import copy
 from einops import rearrange
 import random
-from tools.token_dataloader import TokenLoader
+from tools.token_dataloader import UncondTokenLoader
 
 logger = utils.logger
 
@@ -28,9 +28,11 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, device='cuda'):
     cond_prob = 0.3
 
 
-    moso_opt = yaml.load(open('config/vqvae_raw.yaml', 'r'), Loader=yaml.FullLoader)
-    moso_model_opt = moso_opt['model']
+    # TODO: should load a pretrained vqvae model, but now we just use a random initialized one.
     if frozen_vqvae is None:
+        moso_opt = yaml.load(open('config/vqvae_raw.yaml', 'r'), Loader=yaml.FullLoader)
+        moso_model_opt = moso_opt['model']
+        logger.debug('show vqvae config:', moso_model_opt)
         frozen_vqvae = VQVAEModel(moso_model_opt, moso_opt).to(device)
 
     linear_start = 0.0015
@@ -38,18 +40,25 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, device='cuda'):
     log_every_t = 200
     w = 0.0
 
-    unet_path = './config/small_unet.yaml'
-    ldm_path = './config/ldm_base.yaml'
-    unet_config = OmegaConf.load(unet_path).unet_config
-    unet_config.cond_model = False
-    # unet_config = OmegaConf.load(ldm_path).model.params.unet_config
-    logger.debug(unet_config)
+    # intialize DDPM model from scratch
     if unet is None:
+        unet_path = './config/small_unet.yaml'
+        ldm_path = './config/ldm_base.yaml'
+        unet_config = OmegaConf.load(unet_path).unet_config
+        unet_config.cond_model = False
+        # unet_config = OmegaConf.load(ldm_path).model.params.unet_config
+
+        unet_config.ds_bg = moso_model_opt['ds_background']
+        unet_config.ds_id = moso_model_opt['ds_identity']
+        unet_config.ds_mo = moso_model_opt['ds_motion']
+        unet_config.vae_hidden = moso_model_opt['num_hiddens']
+
+        logger.debug(unet_config)
         unet = UNetModel(**unet_config).to(device)
 
     diffusion_wrapper = DiffusionWrapper(model=unet, conditioning_key=None).to(device)
 
-    diffusion_criterion = DDPM(diffusion_wrapper,
+    ddpm_criterion = DDPM(diffusion_wrapper,
                      channels=unet_config.in_channels,
                      image_size=unet_config.image_size,
                      linear_start=linear_start,
@@ -79,13 +88,15 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, device='cuda'):
     frozen_vqvae.eval()
     diffusion_wrapper.train()
 
-    train_loader = TokenLoader(train_data_path, batch_size=2)
+    train_loader = UncondTokenLoader(train_data_path, batch_size=2)
 
     for epoch in range(num_epochs):
 
+        train_loader.reset()
+
         for it, inputs in enumerate(train_loader):
-            # if it > 0:
-            #     break
+            if it > 0:
+                break
 
             bg_tokens, id_tokens, mo_tokens = inputs
             bg_tokens = bg_tokens.to(device)
@@ -126,7 +137,7 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, device='cuda'):
             logger.debug('show z shape', z.shape)
 
             # Unconditional Training
-            (loss, t, output), loss_dict = diffusion_criterion(z.float())
+            (loss, t, output), loss_dict = ddpm_criterion(z.float())
 
             loss.backward()
             optimizer.step()
@@ -144,10 +155,13 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, device='cuda'):
 
                 losses = dict()
                 losses['diffusion_loss'] = AverageMeter()
+            logger.info(f'\r[Epoch {epoch}] [Diffusion Loss {loss.item()}]', end='')
+        print()
 
 
 
 
 if __name__ == '__main__':
+    # change message level of the logger.
+    # logger.set_level('info')
     train(frozen_vqvae=None, unet=None, train_data_path='./data', num_epochs=1, device='cuda')
-
