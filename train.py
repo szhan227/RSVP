@@ -16,7 +16,7 @@ from utils import AverageMeter, Logger
 import copy
 from einops import rearrange
 import random
-from tools.token_dataloader import UncondTokenLoader
+from tools.token_dataloader import UncondTokenLoader, CondTokenLoader
 
 logger = utils.logger
 
@@ -39,6 +39,7 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, device='cuda'):
     linear_end = 0.0195
     log_every_t = 200
     w = 0.0
+    batch_size = 2
 
     # intialize DDPM model from scratch
     if unet is None:
@@ -88,56 +89,88 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, device='cuda'):
     frozen_vqvae.eval()
     diffusion_wrapper.train()
 
-    train_loader = UncondTokenLoader(train_data_path, batch_size=2)
+    if unet.cond_model:
+        train_loader = CondTokenLoader(train_data_path, batch_size=batch_size)
+    else:
+        train_loader = UncondTokenLoader(train_data_path, batch_size=batch_size)
 
     for epoch in range(num_epochs):
 
         train_loader.reset()
 
         for it, inputs in enumerate(train_loader):
-            if it > 0:
-                break
+            # if it > 0:
+            #     break
+            if unet.cond_model:
+                c_toks, x_toks = inputs
+                cbg_toks, cid_toks, cmo_toks = c_toks
+                xbg_toks, xid_toks, xmo_toks = x_toks
 
-            bg_tokens, id_tokens, mo_tokens = inputs
-            bg_tokens = bg_tokens.to(device)
-            id_tokens = id_tokens.to(device)
-            mo_tokens = mo_tokens.to(device)
-            B, T, _, _ = mo_tokens.shape
+                B, T, _, _ = cmo_toks.shape
 
-            # shape: (B, T, C, H, W)
-            bg_quantized, id_quantized, mo_quantized = frozen_vqvae.get_quantized_by_tokens(bg_tokens, id_tokens, mo_tokens)
+                cbg_quantized, cid_quantized, cmo_quantized = frozen_vqvae.get_quantized_by_tokens(cbg_toks, cid_toks, cmo_toks)
+                xbg_quantized, xid_quantized, xmo_quantized = frozen_vqvae.get_quantized_by_tokens(xbg_toks, xid_toks, xmo_toks)
 
-            logger.debug('bg_quantized', bg_quantized.shape)
-            logger.debug('id_quantized', id_quantized.shape)
-            logger.debug('mo_quantized', mo_quantized.shape)
+                logger.debug('cbg_quantized', cbg_quantized.shape)
+                logger.debug('cid_quantized', cid_quantized.shape)
+                logger.debug('cmo_quantized', cmo_quantized.shape)
+                logger.debug('xbg_quantized', xbg_quantized.shape)
+                logger.debug('xid_quantized', xid_quantized.shape)
+                logger.debug('xmo_quantized', xmo_quantized.shape)
 
-            # cbg_quantized, xbg_quantized = torch.clone(bg_quantized), torch.clone(bg_quantized)
-            # cid_quantized, xid_quantized = torch.clone(id_quantized), torch.clone(id_quantized)
-            # cmo_quantized, xmo_quantized = torch.chunk(mo_quantized, 2, dim=1)
+                cbg_quantized = rearrange(bg_quantized, 'b t c h w -> b c (t h w)')
+                cid_quantized = rearrange(id_quantized, 'b t c h w -> b c (t h w)')
+                cmo_quantized = rearrange(mo_quantized, 'b t c h w -> b c (t h w)')
 
-            bg_quantized = rearrange(bg_quantized, 'b t c h w -> b c (t h w)')
-            id_quantized = rearrange(id_quantized, 'b t c h w -> b c (t h w)')
-            mo_quantized = rearrange(mo_quantized, 'b t c h w -> b c (t h w)')
+                xbg_quantized = rearrange(bg_quantized, 'b t c h w -> b c (t h w)')
+                xid_quantized = rearrange(id_quantized, 'b t c h w -> b c (t h w)')
+                xmo_quantized = rearrange(mo_quantized, 'b t c h w -> b c (t h w)')
 
-            # cbg_quantized = rearrange(cbg_quantized, 'b t c h w -> b c (t h w)')
-            # cid_quantized = rearrange(cid_quantized, 'b t c h w -> b c (t h w)')
-            # cmo_quantized = rearrange(cmo_quantized, 'b t c h w -> b c (t h w)')
-            # xbg_quantized = rearrange(xbg_quantized, 'b t c h w -> b c (t h w)')
-            # xid_quantized = rearrange(xid_quantized, 'b t c h w -> b c (t h w)')
-            # xmo_quantized = rearrange(xmo_quantized, 'b t c h w -> b c (t h w)')
+                zc = torch.cat([cbg_quantized, cid_quantized, cmo_quantized], dim=-1)
+                zx = torch.cat([xbg_quantized, xid_quantized, xmo_quantized], dim=-1)
 
-            logger.debug('after rearrange quantized')
-            logger.debug('xbg_quantized', bg_quantized.shape)
-            logger.debug('xid_quantized', id_quantized.shape)
-            logger.debug('xmo_quantized', mo_quantized.shape)
 
-            z = torch.concat([bg_quantized, id_quantized, mo_quantized], dim=-1)
-            # c = torch.concat([cbg_quantized, cid_quantized, cmo_quantized], dim=-1)
+            else:
+                bg_tokens, id_tokens, mo_tokens = inputs
+                bg_tokens = bg_tokens.to(device)
+                id_tokens = id_tokens.to(device)
+                mo_tokens = mo_tokens.to(device)
+                B, T, _, _ = mo_tokens.shape
 
-            logger.debug('show z shape', z.shape)
+                # shape: (B, T, C, H, W)
+                bg_quantized, id_quantized, mo_quantized = frozen_vqvae.get_quantized_by_tokens(bg_tokens, id_tokens, mo_tokens)
 
-            # Unconditional Training
-            (loss, t, output), loss_dict = ddpm_criterion(z.float())
+                logger.debug('bg_quantized', bg_quantized.shape)
+                logger.debug('id_quantized', id_quantized.shape)
+                logger.debug('mo_quantized', mo_quantized.shape)
+
+                # cbg_quantized, xbg_quantized = torch.clone(bg_quantized), torch.clone(bg_quantized)
+                # cid_quantized, xid_quantized = torch.clone(id_quantized), torch.clone(id_quantized)
+                # cmo_quantized, xmo_quantized = torch.chunk(mo_quantized, 2, dim=1)
+
+                bg_quantized = rearrange(bg_quantized, 'b t c h w -> b c (t h w)')
+                id_quantized = rearrange(id_quantized, 'b t c h w -> b c (t h w)')
+                mo_quantized = rearrange(mo_quantized, 'b t c h w -> b c (t h w)')
+
+                # cbg_quantized = rearrange(cbg_quantized, 'b t c h w -> b c (t h w)')
+                # cid_quantized = rearrange(cid_quantized, 'b t c h w -> b c (t h w)')
+                # cmo_quantized = rearrange(cmo_quantized, 'b t c h w -> b c (t h w)')
+                # xbg_quantized = rearrange(xbg_quantized, 'b t c h w -> b c (t h w)')
+                # xid_quantized = rearrange(xid_quantized, 'b t c h w -> b c (t h w)')
+                # xmo_quantized = rearrange(xmo_quantized, 'b t c h w -> b c (t h w)')
+
+                logger.debug('after rearrange quantized')
+                logger.debug('xbg_quantized', bg_quantized.shape)
+                logger.debug('xid_quantized', id_quantized.shape)
+                logger.debug('xmo_quantized', mo_quantized.shape)
+
+                zx = torch.concat([bg_quantized, id_quantized, mo_quantized], dim=-1)
+                # c = torch.concat([cbg_quantized, cid_quantized, cmo_quantized], dim=-1)
+
+                logger.debug('show zx shape', zx.shape)
+
+                # Unconditional Training
+                (loss, t, output), loss_dict = ddpm_criterion(zx.float())
 
             loss.backward()
             optimizer.step()
