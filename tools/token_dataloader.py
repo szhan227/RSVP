@@ -6,10 +6,11 @@ import torch
 
 class UncondTokenLoader:
 
-    def __init__(self, data_folder_path, batch_size=1, shuffle=True):
+    def __init__(self, data_folder_path, batch_size=1, device='cpu', shuffle=True):
         paths = glob.glob(data_folder_path + '/*.npy')
         self.data_paths = np.array(paths)
         self.batch_size = batch_size
+        self.device = device
         if shuffle:
             self.data_paths = np.random.permutation(self.data_paths)
 
@@ -34,9 +35,9 @@ class UncondTokenLoader:
                 id_tokens.append(data['id_tokens'])
                 mo_tokens.append(data['mo_tokens'])
 
-            bg_tokens = torch.from_numpy(np.array(bg_tokens))
-            id_tokens = torch.from_numpy(np.array(id_tokens))
-            mo_tokens = torch.from_numpy(np.array(mo_tokens))
+            bg_tokens = torch.from_numpy(np.array(bg_tokens)).to(self.device)
+            id_tokens = torch.from_numpy(np.array(id_tokens)).to(self.device)
+            mo_tokens = torch.from_numpy(np.array(mo_tokens)).to(self.device)
             self.end += self.batch_size
             self.start += self.batch_size
             yield torch.unsqueeze(bg_tokens, dim=1), torch.unsqueeze(id_tokens, dim=1), mo_tokens
@@ -59,16 +60,16 @@ class CondTokenLoader(UncondTokenLoader):
                 cbg_tokens.append(data['cbg_tokens'])
                 cid_tokens.append(data['cid_tokens'])
                 cmo_tokens.append(data['cmo_tokens'])
-                xbg_tokens.append(data['xbg_tokens'])
-                xid_tokens.append(data['xid_tokens'])
-                xmo_tokens.append(data['xmo_tokens'])
+                xbg_tokens.append(data['bg_tokens'])
+                xid_tokens.append(data['id_tokens'])
+                xmo_tokens.append(data['mo_tokens'])
 
-            cbg_tokens = torch.from_numpy(np.array(cbg_tokens))
-            cid_tokens = torch.from_numpy(np.array(cid_tokens))
-            cmo_tokens = torch.from_numpy(np.array(cmo_tokens))
-            xbg_tokens = torch.from_numpy(np.array(xbg_tokens))
-            xid_tokens = torch.from_numpy(np.array(xid_tokens))
-            xmo_tokens = torch.from_numpy(np.array(xmo_tokens))
+            cbg_tokens = torch.from_numpy(np.array(cbg_tokens)).to(self.device)
+            cid_tokens = torch.from_numpy(np.array(cid_tokens)).to(self.device)
+            cmo_tokens = torch.from_numpy(np.array(cmo_tokens)).to(self.device)
+            xbg_tokens = torch.from_numpy(np.array(xbg_tokens)).to(self.device)
+            xid_tokens = torch.from_numpy(np.array(xid_tokens)).to(self.device)
+            xmo_tokens = torch.from_numpy(np.array(xmo_tokens)).to(self.device)
             self.end += self.batch_size
             self.start += self.batch_size
             c_toks = torch.unsqueeze(cbg_tokens, dim=1), torch.unsqueeze(cid_tokens, dim=1), cmo_tokens
@@ -77,7 +78,12 @@ class CondTokenLoader(UncondTokenLoader):
 
 
 if __name__ == '__main__':
-    loader = UncondTokenLoader('../data', batch_size=2)
+    # data_folder_path = '../data2'
+    # paths = glob.glob(data_folder_path + '/*.npy')
+    # path = paths[0]
+    # data = np.load(path, allow_pickle=True).item()
+    # print(data.keys())
+    loader = CondTokenLoader('../data2', batch_size=2)
     for batch in loader:
-        bg, id, mo = batch
-        print(bg.shape, id.shape, mo.shape)
+        print(batch)
+        break

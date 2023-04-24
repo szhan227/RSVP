@@ -443,6 +443,13 @@ class VQVAEModel(nn.Module):
 
         return quantized_bg, quantized_id, quantized_mo
 
+    def get_quantized_by_tokens_with_rearrange(self, bg_tokens, id_tokens, mo_tokens):
+        quantized_bg, quantized_id, quantized_mo = self.get_quantized_by_tokens(bg_tokens, id_tokens, mo_tokens)
+        quantized_bg = rearrange(quantized_bg, 'b t c h w -> b c (t h w)')
+        quantized_id = rearrange(quantized_id, 'b t c h w -> b c (t h w)')
+        quantized_mo = rearrange(quantized_mo, 'b t c h w -> b c (t h w)')
+        return quantized_bg, quantized_id, quantized_mo
+
     def convert_latent_to_quantized(self, z, ds_b, ds_i, ds_m, hidden_sz, num_frames):
         # z shape: [B, hidden_sz, xxx]
         # in our case hidden_sz = 256

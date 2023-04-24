@@ -22,7 +22,7 @@ class Logger(object):
         if not os.path.exists("./results/"):
             os.mkdir("./results/")
         if fn is None:
-            fn = f'log_{self.level}_{datetime.now().strftime("%y%m%d_%H%M%S")}'
+            fn = f'log_{datetime.now().strftime("%y%m%d_%H%M%S")}'
         logdir = self._make_dir(fn)
         if not os.path.exists(logdir):
             os.mkdir(logdir)

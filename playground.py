@@ -162,7 +162,7 @@ def play_with_MOSO_VAE():
     logger.debug('output.shape:', outputs.shape)
 
     # (5, 4, 2048)
-    outputs = model(validate_inputs, is_training=False, writer=None)
+    # outputs = model(validate_inputs, is_training=False, writer=None)
     # dict_keys(['loss', 'x_rec', 'quantize_bg', 'quantize_id', 'quantize_mo', 'ssim_metric', 'rec_loss', 'lpips_loss', 'record_logs', 'optimizer_idx'])
     logger.debug('outputs.shape:', outputs['x_rec'].shape)
 
@@ -203,6 +203,10 @@ def play_with_all_process():
     unet_path = './config/small_unet.yaml'
     ldm_path = './config/ldm_base.yaml'
     unet_config = OmegaConf.load(unet_path).unet_config
+    unet_config.ds_bg = 3
+    unet_config.ds_id = 4
+    unet_config.ds_mo = 5
+    unet_config.vae_hidden = 256
     # unet_config = OmegaConf.load(ldm_path).model.params.unet_config
     logger.debug(unet_config)
     logger.debug('cuda: ', torch.torch.cuda.device_count())
@@ -423,13 +427,13 @@ def play_with_all_process():
         opt.step()
 
         losses['diffusion_loss'].update(loss.item(), 1)
-        # print('show diffusion model output: ', output.shape)
-        # out_bg, out_id, out_mo = utils.convert_latent_to_quantized(output, 3, 4, 5, 256, 16)
-        # #
-        # print('show out_bg: ', out_bg.shape)
-        # print('show out_id: ', out_id.shape)
-        # print('show out_mo: ', out_mo.shape)
+        print('show diffusion model output: ', output.shape)
+        out_bg, out_id, out_mo = first_stage_model.convert_latent_to_quantized(output, 3, 4, 5, 256, 16)
         #
+        print('show out_bg: ', out_bg.shape)
+        print('show out_id: ', out_id.shape)
+        print('show out_mo: ', out_mo.shape)
+
         # out_bg = rearrange(out_bg, 'b c (t h w) -> b t c h w', t=1, h=32, w=32)
         # out_id = rearrange(out_id, 'b c (t h w) -> b t c h w', t=1, h=16, w=16)
         # out_mo = rearrange(out_mo, 'b c (t h w) -> b t c h w', t=16, h=8, w=8)
@@ -438,12 +442,12 @@ def play_with_all_process():
         # print('after rearrange out_id: ', out_id.shape)
         # print('after rearrange out_mo: ', out_mo.shape)
 
-        # recon = first_stage_model._decoder(out_bg, out_id, out_mo)[0]
-        # print('show vae recon: ', recon.shape)
-        # output = first_stage_model._decoder(xbg_quantized, xid_quantized, xmo_quantized)[0]
-        # if output != None:
-        #     print('decode the output: ', output.shape)
-        #     return
+        recon = first_stage_model._decoder(out_bg, out_id, out_mo)[0]
+        print('show vae recon: ', recon.shape)
+        output = first_stage_model._decoder(xbg_quantized, xid_quantized, xmo_quantized)[0]
+        if output != None:
+            print('decode the output: ', output.shape)
+            return
 
         # ema model
         if it % 25 == 0 and it > 0:
