@@ -210,7 +210,10 @@ def play_with_all_process():
     # unet_config = OmegaConf.load(ldm_path).model.params.unet_config
     logger.debug(unet_config)
     logger.debug('cuda: ', torch.torch.cuda.device_count())
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    device = 'cpu'
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     logger.debug('in this project, use device: ', device)
     video_x = torch.randn(5, 4, 2048).to(device)
     timesteps = torch.tensor([0, 1, 2, 3, 4]).to(device)
@@ -280,7 +283,7 @@ def play_with_all_process():
         # Now for quantized
 
         x = x.to(device)
-        x = x.repeat(3, 1, 1, 1, 1, 1)
+        # x = x.repeat(3, 1, 1, 1, 1, 1)
 
         batch_size = x.shape[0]
         x = rearrange(x, 'b d t c h w -> b d t c h w')
@@ -427,12 +430,12 @@ def play_with_all_process():
         opt.step()
 
         losses['diffusion_loss'].update(loss.item(), 1)
-        print('show diffusion model output: ', output.shape)
+        logger.debug('show diffusion model output: ', output.shape)
         out_bg, out_id, out_mo = first_stage_model.convert_latent_to_quantized(output, 3, 4, 5, 256, 16)
         #
-        print('show out_bg: ', out_bg.shape)
-        print('show out_id: ', out_id.shape)
-        print('show out_mo: ', out_mo.shape)
+        logger.debug('show out_bg: ', out_bg.shape)
+        logger.debug('show out_id: ', out_id.shape)
+        logger.debug('show out_mo: ', out_mo.shape)
 
         # out_bg = rearrange(out_bg, 'b c (t h w) -> b t c h w', t=1, h=32, w=32)
         # out_id = rearrange(out_id, 'b c (t h w) -> b t c h w', t=1, h=16, w=16)
@@ -444,10 +447,10 @@ def play_with_all_process():
 
         recon = first_stage_model._decoder(out_bg, out_id, out_mo)[0]
         print('show vae recon: ', recon.shape)
-        output = first_stage_model._decoder(xbg_quantized, xid_quantized, xmo_quantized)[0]
-        if output != None:
-            print('decode the output: ', output.shape)
-            return
+        # output = first_stage_model._decoder(xbg_quantized, xid_quantized, xmo_quantized)[0]
+        # if output != None:
+        #     print('decode the output: ', output.shape)
+        #     return
 
         # ema model
         if it % 25 == 0 and it > 0:

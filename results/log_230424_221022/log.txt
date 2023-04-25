@@ -1,0 +1,39 @@
+load vqvae and show config: {'name': 'MoCoVQVAE_wCD_shareCB', 'pretrain_path': None, 'checkpoint_path': 'experiments/MoCoVQVAEwCDsCB_Face_im256_16frames_id4_2022-06-27-16-37-57/MoCoVQVAE_wCD_shareCB_iter80000.pth', 'load_strict': True, 'num_hiddens': 256, 'num_residual_layers': 4, 'num_residual_hiddens': 128, 'embedding_dim': 256, 'num_embeddings': 24576, 'ds_content': 3, 'ds_motion': 5, 'ds_identity': 4, 'ds_background': 3, 'suf_method': 'conv', 'decoder_type': 'decoder_woPA', 'encoder_mo_type': 'default', 'num_head': 4, 'num_group': 4, 'ABS_weight': 1.0, 'MSE_weight': 0.0, 'Gen_weight': 0.1, 'decay': 0.99, 'if_augcb': 2, 'commitment_cost': 0.25, 'with_lpips': True, 'lpips_factor': 1.0, 'disc_name': 'patchwise', 'disc_opt': {'input_nc': 48, 'n_layers': 3, 'ndf': 64, 'input_formation': 'concat_c'}}
+!!!!!!!!!!! time head: 16 !!!!!!!!!!!!!
+!!! ABS_weight: 1.0
+!!! MSE_weight: 0
+!!! SSIM_weight: 0
+contructing model...
+ds_background:  3
+num_hiddens:  256
+num_residual_layers:  4
+num_residual_hiddens:  128
+suf_method:  conv
+n_frames:  16
+Loading Motion Encoder: Encoder_Motion...
+WARNING: pre_up_bg:  Identity()
+WARNING: pre_up_id:  Upsample(scale_factor=2.0, mode=bilinear)
+{'image_size': 32, 'in_channels': 256, 'out_channels': 256, 'model_channels': 32, 'attention_resolutions': [4, 2, 1], 'num_res_blocks': 2, 'channel_mult': [1, 2, 4, 4], 'num_heads': 8, 'use_scale_shift_norm': True, 'resblock_updown': True, 'cond_model': True, 'ds_bg': 3, 'ds_id': 4, 'ds_mo': 5, 'vae_hidden': 256}
+before loop:
+num of input blocks: 1
+num of input attns: 1
+DDPM: Running in eps-prediction mode
+for bg encoder, _ds_m =  3 , xs.shape =  torch.Size([16, 3, 256, 256]) torch.float32
+in bg _layer 0, xs.shape =  torch.Size([16, 256, 128, 128]) torch.float32
+in bg _layer 1, xs.shape =  torch.Size([16, 256, 64, 64]) torch.float32
+in bg _layer 2, xs.shape =  torch.Size([16, 256, 32, 32]) torch.float32
+in bg encoder conv, xs.shape =  torch.Size([16, 256, 32, 32]) torch.float32
+in bg encoder conv after rearrange, xs.shape =  torch.Size([1, 4096, 32, 32]) torch.float32
+for id encoder: _ds_m =  4
+for mo encoder: _ds_m =  5
+feat_bg.shape:  torch.Size([1, 1, 256, 32, 32])
+feat_id.shape:  torch.Size([1, 1, 256, 16, 16])
+feat_mo.shape:  torch.Size([1, 16, 256, 8, 8])
+show encoding indices: torch.Size([1024])
+show encodings: torch.Size([1024, 24576])
+show encoding indices: torch.Size([256])
+show encodings: torch.Size([256, 24576])
+show encoding indices: torch.Size([1024])
+show encodings: torch.Size([1024, 24576])
+show t in p_losses: tensor([402]) torch.Size([1])
+show timesteps:  tensor([402]) torch.Size([1])
