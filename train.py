@@ -182,6 +182,7 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, dev
                 losses['diffusion_loss'] = AverageMeter()
             logger.info(f'\r[Epoch {epoch}] [Diffusion Loss {loss.item()}]', end='')
         print()
+    torch.save(diffusion_wrapper.state_dict(), 'chkpt/ddpm_wrapper_model.pt')
 
 
 
@@ -189,4 +190,8 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, dev
 if __name__ == '__main__':
     # change message level of the logger.
     logger.set_level('info')
-    train(frozen_vqvae=None, unet=None, train_data_path='./data2', num_epochs=1, batch_size=2, device='cuda')
+
+    # TODO: load your pretrained vqvae model here. Unet = None means to train DDPM from scratch.
+    frozen_vqvae = None
+
+    train(frozen_vqvae=frozen_vqvae, unet=None, train_data_path='./data2', num_epochs=100, batch_size=2, device='cuda')

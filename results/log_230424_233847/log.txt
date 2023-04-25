@@ -1,0 +1,9 @@
+DDPM: Running in eps-prediction mode
+Load conditional token dataset.
+show timesteps:  tensor([106, 252], device='cuda:0') torch.Size([2])
+[Time 6.044] [Diffusion 0.000000]
+[Epoch 0] [Diffusion Loss 0.9981613159179688]
+show timesteps:  tensor([523, 238], device='cuda:0') torch.Size([2])
+[Epoch 0] [Diffusion Loss 0.9979549050331116]
+show timesteps:  tensor([976, 867], device='cuda:0') torch.Size([2])
+[Epoch 0] [Diffusion Loss 1.0005412101745605]

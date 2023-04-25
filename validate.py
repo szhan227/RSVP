@@ -20,7 +20,7 @@ from tools.token_dataloader import UncondTokenLoader, CondTokenLoader
 
 logger = utils.logger
 
-def validate(input_batch, condition_batch=None, vqvae=None, unet=None, device='cpu'):
+def validate(input_batch, condition_batch=None, vqvae=None, diffusion_wrapper=None, device='cpu'):
     """
     :param input_batch: raw input video in shape (D, B, T, C, H, W) after preprocessing
            D: number of decomposition, here to be 4: x, bg, id, mo respectively
@@ -54,7 +54,7 @@ def validate(input_batch, condition_batch=None, vqvae=None, unet=None, device='c
 
     vqvae.eval()
 
-    if unet is None:
+    if diffusion_wrapper is None:
         unet_path = './config/small_unet.yaml'
         ldm_path = './config/ldm_base.yaml'
         unet_config = OmegaConf.load(unet_path).unet_config
@@ -67,8 +67,8 @@ def validate(input_batch, condition_batch=None, vqvae=None, unet=None, device='c
 
         logger.debug(unet_config)
         unet = UNetModel(**unet_config).to(device)
+        diffusion_wrapper = DiffusionWrapper(unet).to(device)
 
-    diffusion_wrapper = DiffusionWrapper(unet)
     diffusion_wrapper.eval()
 
     ddpm_criterion = DDPM(diffusion_wrapper,
@@ -128,10 +128,16 @@ def validate(input_batch, condition_batch=None, vqvae=None, unet=None, device='c
 
 
 if __name__ == '__main__':
-    #input_batch: raw input video in shape (D, B, T, C, H, W)
+
     logger.set_level('info')
+
+    # TODO: load preprocessed decomposition of input and condition batch, see params in function 'validate'
     input_batch = torch.randn(4, 1, 16, 3, 256, 256)
     condition_batch = torch.randn(4, 1, 16, 3, 256, 256)
-    output = validate(input_batch, condition_batch, vqvae=None, unet=None, device='cuda')
+
+    # TODO: load models
+    vqvae = None
+    diffusion_wrapper = None
+    output = validate(input_batch, condition_batch, vqvae=vqvae, diffusion_wrapper=diffusion_wrapper, device='cuda')
     print(output.shape)
 
