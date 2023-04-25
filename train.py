@@ -18,8 +18,20 @@ from einops import rearrange
 import random
 from tools.token_dataloader import UncondTokenLoader, CondTokenLoader
 import argparse
+import os, csv
 
 logger = utils.logger
+
+
+def write_csv(record, path):
+    header = ['iteration', 'loss']
+    file_exists = os.path.isfile(path)
+
+    with open(path, mode='a', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        if not file_exists:
+            writer.writerow(header)
+        writer.writerow(record)
 
 
 def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, save_every_n_epoch=None, device='cuda'):
@@ -187,6 +199,8 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
         # save model to checkpoint every n epoch
         if save_every_n_epoch and epoch > 0 and epoch % save_every_n_epoch == 0:
             torch.save(diffusion_wrapper.state_dict(), f'chkpt/ddpm/ddpm_wrapper_model_ep_{epoch}.pt')
+
+        write_csv([str(epoch), str(loss.item())], './results/training_loss.csv')
 
     torch.save(diffusion_wrapper.state_dict(), 'chkpt/ddpm/ddpm_wrapper_model.pt')
 
