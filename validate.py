@@ -80,6 +80,14 @@ def validate(input_batch, condition_batch=None, vqvae=None, diffusion_wrapper=No
                           w=w,
                           ).to(device)
 
+    ddpm_criterion.eval()
+
+    ds_bg = unet.ds_bg
+    ds_id = unet.ds_id
+    ds_mo = unet.ds_mo
+    hidden_size = diffusion_wrapper.diffusion_model.vae_hidden
+    n_frames = T
+
     input_batch = rearrange(input_batch, 'd b t c h w -> b d t c h w')
     x = input_batch[:, 0, :, :, :, :]
     xbg = input_batch[:, 1, :, :, :, :]
@@ -92,33 +100,30 @@ def validate(input_batch, condition_batch=None, vqvae=None, diffusion_wrapper=No
     cid = condition_batch[:, 2, :, :, :, :]
     cmo = condition_batch[:, 3, :, :, :, :]
 
-    xbg_toks, xid_toks, xmo_toks = vqvae.extract_tokens([x, xbg, xid, xmo], is_training=False)
-    xbg_quantized, xid_quantized, xmo_quantized = vqvae.get_quantized_by_tokens(xbg_toks, xid_toks, xmo_toks)
+    with torch.no_grad():
 
-    cbg_toks, cid_toks, cmo_toks = vqvae.extract_tokens([c, cbg, cid, cmo], is_training=False)
-    cbg_quantized, cid_quantized, cmo_quantized = vqvae.get_quantized_by_tokens(cbg_toks, cid_toks, cmo_toks)
+        xbg_toks, xid_toks, xmo_toks = vqvae.extract_tokens([x, xbg, xid, xmo], is_training=False)
+        xbg_quantized, xid_quantized, xmo_quantized = vqvae.get_quantized_by_tokens(xbg_toks, xid_toks, xmo_toks)
 
-    xbg_quantized = rearrange(xbg_quantized, 'b t c h w -> b c (t h w)')
-    xid_quantized = rearrange(xid_quantized, 'b t c h w -> b c (t h w)')
-    xmo_quantized = rearrange(xmo_quantized, 'b t c h w -> b c (t h w)')
+        cbg_toks, cid_toks, cmo_toks = vqvae.extract_tokens([c, cbg, cid, cmo], is_training=False)
+        cbg_quantized, cid_quantized, cmo_quantized = vqvae.get_quantized_by_tokens(cbg_toks, cid_toks, cmo_toks)
 
-    cbg_quantized = rearrange(cbg_quantized, 'b t c h w -> b c (t h w)')
-    cid_quantized = rearrange(cid_quantized, 'b t c h w -> b c (t h w)')
-    cmo_quantized = rearrange(cmo_quantized, 'b t c h w -> b c (t h w)')
+        xbg_quantized = rearrange(xbg_quantized, 'b t c h w -> b c (t h w)')
+        xid_quantized = rearrange(xid_quantized, 'b t c h w -> b c (t h w)')
+        xmo_quantized = rearrange(xmo_quantized, 'b t c h w -> b c (t h w)')
 
-    zx = torch.cat([xbg_quantized, xid_quantized, xmo_quantized], dim=-1)
-    zc = torch.cat([cbg_quantized, cid_quantized, cmo_quantized], dim=-1)
+        cbg_quantized = rearrange(cbg_quantized, 'b t c h w -> b c (t h w)')
+        cid_quantized = rearrange(cid_quantized, 'b t c h w -> b c (t h w)')
+        cmo_quantized = rearrange(cmo_quantized, 'b t c h w -> b c (t h w)')
 
-    (loss, t, z_output), loss_dict = ddpm_criterion(zx, zc)
+        zx = torch.cat([xbg_quantized, xid_quantized, xmo_quantized], dim=-1)
+        zc = torch.cat([cbg_quantized, cid_quantized, cmo_quantized], dim=-1)
 
-    ds_bg = unet.ds_bg
-    ds_id = unet.ds_id
-    ds_mo = unet.ds_mo
-    hidden_size = unet.vae_hidden
-    n_frames = T
+        (loss, t, z_output), loss_dict = ddpm_criterion(zx, zc)
 
-    logger.debug('z_output.shape:', z_output.shape)
-    out_bg, out_id, out_mo = vqvae.convert_latent_to_quantized(z_output, ds_bg, ds_id, ds_mo, hidden_size, n_frames)
+        logger.debug('z_output.shape:', z_output.shape)
+        out_bg, out_id, out_mo = vqvae.convert_latent_to_quantized(z_output, ds_bg, ds_id, ds_mo, hidden_size, n_frames)
+
     logger.debug('out_bg.shape:', out_bg.shape)
     logger.debug('out_id.shape:', out_id.shape)
     logger.debug('out_mo.shape:', out_mo.shape)
@@ -130,12 +135,11 @@ def validate(input_batch, condition_batch=None, vqvae=None, diffusion_wrapper=No
 if __name__ == '__main__':
 
     logger.set_level('info')
-
     # TODO: load preprocessed decomposition of input and condition batch, see params in function 'validate'
-    input_batch = torch.randn(4, 1, 16, 3, 256, 256)
-    condition_batch = torch.randn(4, 1, 16, 3, 256, 256)
+    input_batch = torch.randn(4, 1, 16, 3, 256, 256).to('cuda')
+    condition_batch = torch.randn(4, 1, 16, 3, 256, 256).to('cuda')
 
-    # TODO: load models
+    # TODO: load models from checkpoints
     vqvae = None
     diffusion_wrapper = None
     output = validate(input_batch, condition_batch, vqvae=vqvae, diffusion_wrapper=diffusion_wrapper, device='cuda')

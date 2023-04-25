@@ -17,11 +17,12 @@ import copy
 from einops import rearrange
 import random
 from tools.token_dataloader import UncondTokenLoader, CondTokenLoader
+import argparse
 
 logger = utils.logger
 
 
-def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, device='cuda'):
+def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, save_every_n_epoch=None, device='cuda'):
 
     rank = 0
     ema_model = None
@@ -182,16 +183,34 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, dev
                 losses['diffusion_loss'] = AverageMeter()
             logger.info(f'\r[Epoch {epoch}] [Diffusion Loss {loss.item()}]', end='')
         print()
-    torch.save(diffusion_wrapper.state_dict(), 'chkpt/ddpm_wrapper_model.pt')
 
+        # save model to checkpoint every n epoch
+        if save_every_n_epoch and epoch > 0 and epoch % save_every_n_epoch == 0:
+            torch.save(diffusion_wrapper.state_dict(), f'chkpt/ddpm/ddpm_wrapper_model_ep_{epoch}.pt')
 
+    torch.save(diffusion_wrapper.state_dict(), 'chkpt/ddpm/ddpm_wrapper_model.pt')
 
 
 if __name__ == '__main__':
-    # change message level of the logger.
-    logger.set_level('info')
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--epochs',     type=int, required=True)
+    parser.add_argument('--batch_size', type=int, required=True)
+    parser.add_argument('--save_n',     type=int, required=True)
+    parser.add_argument('--msg_level',  type=str, default='info')
+    parser.add_argument('--device',     type=str, default='cuda')
+
+    args = parser.parse_args()
+    # # change message level of the logger.
+    logger.set_level(args.msg_level)
 
     # TODO: load your pretrained vqvae model here. Unet = None means to train DDPM from scratch.
     frozen_vqvae = None
 
-    train(frozen_vqvae=frozen_vqvae, unet=None, train_data_path='./data2', num_epochs=100, batch_size=2, device='cuda')
+    train(frozen_vqvae=frozen_vqvae,
+          unet=None,
+          train_data_path='./data2',
+          num_epochs=args.epochs,
+          batch_size=args.batch_size,
+          save_every_n_epoch=args.save_n,
+          device=args.device)
