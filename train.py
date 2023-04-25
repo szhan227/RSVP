@@ -188,5 +188,5 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, dev
 
 if __name__ == '__main__':
     # change message level of the logger.
-    logger.set_level('debug')
+    logger.set_level('info')
     train(frozen_vqvae=None, unet=None, train_data_path='./data2', num_epochs=1, batch_size=2, device='cuda')
