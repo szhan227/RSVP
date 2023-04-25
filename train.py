@@ -47,6 +47,7 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, dev
         unet_path = './config/small_unet.yaml'
         ldm_path = './config/ldm_base.yaml'
         unet_config = OmegaConf.load(unet_path).unet_config
+        # unet_config.cond_model = False
         # unet_config = OmegaConf.load(ldm_path).model.params.unet_config
 
         unet_config.ds_bg = moso_model_opt['ds_background']
@@ -89,7 +90,6 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, dev
     frozen_vqvae.eval()
     diffusion_wrapper.train()
 
-    unet.cond_model = False
     if unet.cond_model:
         train_loader = CondTokenLoader(train_data_path, batch_size=batch_size, device=device)
         logger.info('Load conditional token dataset.')
@@ -189,4 +189,4 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, dev
 if __name__ == '__main__':
     # change message level of the logger.
     logger.set_level('debug')
-    train(frozen_vqvae=None, unet=None, train_data_path='./data', num_epochs=1, batch_size=2, device='cuda')
+    train(frozen_vqvae=None, unet=None, train_data_path='./data2', num_epochs=1, batch_size=2, device='cuda')

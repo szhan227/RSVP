@@ -20,7 +20,7 @@ from tools.token_dataloader import UncondTokenLoader, CondTokenLoader
 
 logger = utils.logger
 
-def validate(input_batch, vqvae=None, unet=None, device='cpu'):
+def validate(input_batch, condition_batch=None, vqvae=None, unet=None, device='cpu'):
     """
     :param input_batch: raw input video in shape (D, B, T, C, H, W) after preprocessing
            D: number of decomposition, here to be 4: x, bg, id, mo respectively
@@ -29,11 +29,16 @@ def validate(input_batch, vqvae=None, unet=None, device='cpu'):
            C: color channels, here to be 3
            H: height, here to be 256
            W: width, here to be 256
+    :param condition_batch: condition video in shape (B, T, C, H, W), same structure as input_batch
+           if none, set all to zero
     :param vqvae: The pretained vqvae model. If None, initialize a new one from config(only for testing)
     :param unet: The pretrained unet model. If None, initialize a new one from config(only for testing)
     :param device: cpu or cuda
     :return: the output video in shape (B, T, C, H, W)
     """
+
+    if condition_batch is None:
+        condition_batch = torch.zeros_like(input_batch)
 
     linear_start = 0.0015
     linear_end = 0.0195
@@ -77,21 +82,34 @@ def validate(input_batch, vqvae=None, unet=None, device='cpu'):
 
     input_batch = rearrange(input_batch, 'd b t c h w -> b d t c h w')
     x = input_batch[:, 0, :, :, :, :]
-    bg = input_batch[:, 1, :, :, :, :]
-    id = input_batch[:, 2, :, :, :, :]
-    mo = input_batch[:, 3, :, :, :, :]
+    xbg = input_batch[:, 1, :, :, :, :]
+    xid = input_batch[:, 2, :, :, :, :]
+    xmo = input_batch[:, 3, :, :, :, :]
 
-    bg_toks, id_toks, mo_toks = vqvae.extract_tokens([x, bg, id, mo], is_training=False)
+    condition_batch = rearrange(condition_batch, 'd b t c h w -> b d t c h w')
+    c = condition_batch[:, 0, :, :, :, :]
+    cbg = condition_batch[:, 1, :, :, :, :]
+    cid = condition_batch[:, 2, :, :, :, :]
+    cmo = condition_batch[:, 3, :, :, :, :]
 
-    bg_quantized, id_quantized, mo_quantized = vqvae.get_quantized_by_tokens(bg_toks, id_toks, mo_toks)
+    xbg_toks, xid_toks, xmo_toks = vqvae.extract_tokens([x, xbg, xid, xmo], is_training=False)
+    xbg_quantized, xid_quantized, xmo_quantized = vqvae.get_quantized_by_tokens(xbg_toks, xid_toks, xmo_toks)
 
-    bg_quantized = rearrange(bg_quantized, 'b t c h w -> b c (t h w)')
-    id_quantized = rearrange(id_quantized, 'b t c h w -> b c (t h w)')
-    mo_quantized = rearrange(mo_quantized, 'b t c h w -> b c (t h w)')
+    cbg_toks, cid_toks, cmo_toks = vqvae.extract_tokens([c, cbg, cid, cmo], is_training=False)
+    cbg_quantized, cid_quantized, cmo_quantized = vqvae.get_quantized_by_tokens(cbg_toks, cid_toks, cmo_toks)
 
-    z = torch.cat([bg_quantized, id_quantized, mo_quantized], dim=-1)
+    xbg_quantized = rearrange(xbg_quantized, 'b t c h w -> b c (t h w)')
+    xid_quantized = rearrange(xid_quantized, 'b t c h w -> b c (t h w)')
+    xmo_quantized = rearrange(xmo_quantized, 'b t c h w -> b c (t h w)')
 
-    (loss, t, z_output), loss_dict = ddpm_criterion(z)
+    cbg_quantized = rearrange(cbg_quantized, 'b t c h w -> b c (t h w)')
+    cid_quantized = rearrange(cid_quantized, 'b t c h w -> b c (t h w)')
+    cmo_quantized = rearrange(cmo_quantized, 'b t c h w -> b c (t h w)')
+
+    zx = torch.cat([xbg_quantized, xid_quantized, xmo_quantized], dim=-1)
+    zc = torch.cat([cbg_quantized, cid_quantized, cmo_quantized], dim=-1)
+
+    (loss, t, z_output), loss_dict = ddpm_criterion(zx, zc)
 
     ds_bg = unet.ds_bg
     ds_id = unet.ds_id
@@ -99,16 +117,21 @@ def validate(input_batch, vqvae=None, unet=None, device='cpu'):
     hidden_size = unet.vae_hidden
     n_frames = T
 
+    logger.debug('z_output.shape:', z_output.shape)
     out_bg, out_id, out_mo = vqvae.convert_latent_to_quantized(z_output, ds_bg, ds_id, ds_mo, hidden_size, n_frames)
-
-    x_output = vqvae._decode(out_bg, out_id, out_mo)
-    print('show final output.shape:', x_output.shape)
+    logger.debug('out_bg.shape:', out_bg.shape)
+    logger.debug('out_id.shape:', out_id.shape)
+    logger.debug('out_mo.shape:', out_mo.shape)
+    x_output, _, _ = vqvae._decoder(out_bg, out_id, out_mo)
+    logger.debug('show final output.shape:', x_output.shape)
     return x_output
 
 
 if __name__ == '__main__':
     #input_batch: raw input video in shape (D, B, T, C, H, W)
+    logger.set_level('info')
     input_batch = torch.randn(4, 1, 16, 3, 256, 256)
-    output = validate(input_batch, vqvae=None, unet=None, device='cpu')
+    condition_batch = torch.randn(4, 1, 16, 3, 256, 256)
+    output = validate(input_batch, condition_batch, vqvae=None, unet=None, device='cuda')
     print(output.shape)
 
