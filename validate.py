@@ -136,12 +136,15 @@ if __name__ == '__main__':
 
     logger.set_level('info')
     # TODO: load preprocessed decomposition of input and condition batch, see params in function 'validate'
+
+    # batched raw video: (B, 16, 3, 256, 256) -> x, bg, id, mo:  each (B, 16, 3, 256, 256)
+
     input_batch = torch.randn(4, 1, 16, 3, 256, 256).to('cuda')
     condition_batch = torch.randn(4, 1, 16, 3, 256, 256).to('cuda')
 
     # TODO: load models from checkpoints
-    vqvae = None
-    diffusion_wrapper = None
+    vqvae = None # load vqvae here
+    diffusion_wrapper = None # start from scratch
     output = validate(input_batch, condition_batch, vqvae=vqvae, diffusion_wrapper=diffusion_wrapper, device='cuda')
     print(output.shape)
 

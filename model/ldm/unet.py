@@ -891,7 +891,7 @@ class UNetModel(nn.Module):
         :return: an [N x C x ...] Tensor of outputs.
         """
 
-        logger.info('show timesteps: ', timesteps, timesteps.shape)
+        logger.debug('show timesteps: ', timesteps, timesteps.shape)
         assert (y is not None) == (
             self.num_classes is not None
         ), "must specify y if and only if the model is class-conditional"
