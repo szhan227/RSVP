@@ -43,6 +43,7 @@ def init_multiprocessing(rank, sync_device):
 #----------------------------------------------------------------------------
 
 def first_stage(rank, args):
+   
     device = torch.device('cuda', rank)
 
     temp_dir = './'
@@ -54,7 +55,7 @@ def first_stage(rank, args):
         else:
             init_method = f'file://{init_file}'
             torch.distributed.init_process_group(backend='nccl', init_method=init_method, rank=rank, world_size=args.n_gpus)
-
+    
     # Init torch_utils.
     sync_device = torch.device('cuda', rank) if args.n_gpus > 1 else None
     init_multiprocessing(rank=rank, sync_device=sync_device)
@@ -68,7 +69,7 @@ def first_stage(rank, args):
         rootdir = logger.logdir
     else:
         logger = None
-
+    
     if logger is None:
         log_ = print
     else:

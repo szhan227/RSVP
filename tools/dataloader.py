@@ -5,6 +5,9 @@ import random
 import pickle
 import warnings
 import glob
+import json
+import torch.utils.data as Data
+
 
 import imageio
 import numpy as np
@@ -20,7 +23,7 @@ from torchvision.datasets.folder import make_dataset
 from tools.video_utils import VideoClips
 from torchvision.io import read_video
 
-data_location = '/data'
+data_location = '/gpfs/data/jtompki1/yliang51/PVDM/data'
 from utils import set_random_seed
 from tools.data_utils import *
 
@@ -103,7 +106,10 @@ class VideoFolderDataset(Dataset):
         with open(f, "r") as fid:
             data = fid.readlines()
             data = [x.strip().split(" ") for x in data]
-            data = [os.path.join(self.path, x[0]) for x in data]
+            data = [os.path.join(self.path, x[0]) for x in data if x[0] not in ["HorseRiding/v_HorseRiding_g14_c02.avi",
+            "BlowingCandles/v_BlowingCandles_g05_c03.avi",
+            "PushUps/v_PushUps_g16_c04.avi",
+            "SkyDiving/v_SkyDiving_g02_c01.avi"]]
 
             """
             for p in data:
@@ -139,6 +145,8 @@ class VideoFolderDataset(Dataset):
         idx = self.shuffle_indices[idx]
         idx = self.indices[idx]
         video = read_video(self.video_list[idx])[0]
+        if len(video)-self.nframes+1 <= 0:
+            assert False, [self.video_list[idx], len(video), video.shape, self.nframes] 
         prefix = np.random.randint(len(video)-self.nframes+1)
         video = video[prefix:prefix+self.nframes].float().permute(3,0,1,2)
 
@@ -311,3 +319,85 @@ def get_loaders(rank, imgstr, resolution, timesteps, skip, batch_size=1, n_gpus=
     return trainloader, trainloader, testloader 
 
 
+
+
+
+class UCFClassDataset(Dataset):
+    def __init__(self, tokens_dir, class2id):
+        super().__init__()
+
+        self.tokens_dir = tokens_dir
+        self.videos = os.listdir(tokens_dir)
+        self.class2id = json.load(open(class2id, 'r'))
+        self.items = []
+        for cvideo in self.videos:
+            for item in os.listdir(os.path.join(tokens_dir, cvideo)):
+                self.items.append((cvideo, item))
+
+    def __len__(self):
+        return len(self.items)
+
+    def skip_sample(self, ind):
+        if ind >= self.__len__() - 1:
+            return self.__getitem__(0)
+        return self.__getitem__(ind + 1)
+
+    def __getitem__(self, index):
+        item = self.items[index]
+
+        cur_class = self.class2id[item[0].split('_')[1]]
+        ctoken = np.load(os.path.join(self.tokens_dir, item[0], item[1]),
+                         allow_pickle=True)
+        bg_tokens = ctoken.item()['bg_tokens'] # H, W
+        id_tokens = ctoken.item()['id_tokens'] # H, W
+        mo_tokens = ctoken.item()['mo_tokens'] # T, H, W
+
+        cur_class = np.array(cur_class).astype(np.int32)
+        bg_tokens = bg_tokens.flatten().astype(np.int32)
+        id_tokens = id_tokens.flatten().astype(np.int32)
+        mo_tokens = mo_tokens.flatten().astype(np.int32)
+
+        return {
+            'class': cur_class,
+            'bg_tokens': bg_tokens,
+            'id_tokens': id_tokens,
+            'mo_tokens': mo_tokens
+        }
+    
+def get_dataloader(opt):
+    trainset, validset = get_dataset(opt.dataset)
+
+    train_sampler = Data.distributed.DistributedSampler(trainset)
+    trainloader = Data.DataLoader(
+        trainset,
+        sampler=train_sampler,
+        batch_size=opt.dataset.batch_size,
+        pin_memory=opt.dataset.pin_memory,
+        shuffle=opt.dataset.shuffle,
+        num_workers=opt.dataset.num_worker,
+        drop_last=True
+    )
+
+    valid_sampler = Data.distributed.DistributedSampler(validset)
+    validloader = Data.DataLoader(
+        validset,
+        sampler=valid_sampler,
+        batch_size=opt.dataset.batch_size,
+        pin_memory=opt.dataset.pin_memory,
+        shuffle=opt.dataset.shuffle,
+        num_workers=opt.dataset.num_worker,
+        drop_last=True,
+    )
+
+    return trainloader, train_sampler, validloader, valid_sampler
+
+def get_dataset(dataset_opt):
+    if dataset_opt.cname == 'UCFClassDataset':
+        trainset = UCFClassDataset(class2id=dataset_opt.train.class2id,
+                                   tokens_dir=dataset_opt.train.tokens_dir)
+        validset = UCFClassDataset(class2id=dataset_opt.valid.class2id,
+                                   tokens_dir=dataset_opt.valid.tokens_dir)
+    else:
+        raise NotImplementedError(f"Dataset: {dataset_opt.cname}")
+
+    return trainset, validset

@@ -338,6 +338,50 @@ class DDPM(nn.Module):
         else:
             return self.p_sample_loop((batch_size, channels, image_size), cond,
                                   return_intermediates=return_intermediates)
+    
+    def p_mean_variance_moso(self, x, cond, t, context, clip_denoised: bool):
+        model_out = self.model(x, cond, t, context)
+        if self.parameterization == "eps":
+            x_recon = self.predict_start_from_noise(x, t=t, noise=model_out)
+        elif self.parameterization == "x0":
+            x_recon = model_out
+        if clip_denoised:
+            x_recon.clamp_(-1., 1.)
+
+        model_mean, posterior_variance, posterior_log_variance = self.q_posterior(x_start=x_recon, x_t=x, t=t)
+        return model_mean, posterior_variance, posterior_log_variance
+    
+    @torch.no_grad()
+    def p_sample_moso(self, x, cond, t, context, clip_denoised=True, repeat_noise=False):
+        b, *_, device = *x.shape, x.device
+        #assert False, "Pause here"
+        model_mean, _, model_log_variance = self.p_mean_variance_moso(x=x, cond=cond, t=t, context=context, clip_denoised=clip_denoised)
+        noise = noise_like(x.shape, device, repeat_noise)
+        # no noise when t == 0
+        nonzero_mask = (1 - (t == 0).float()).reshape(b, *((1,) * (len(x.shape) - 1)))
+        return model_mean + nonzero_mask * (0.5 * model_log_variance).exp() * noise
+    
+    @torch.no_grad()
+    def sample_moso(self, x, mask, context, return_intermediates=False):
+        device = x.device
+        b, c, t, h, w = x.shape
+        img = torch.randn(x.shape, device=device)
+        #mask = torch.zeros(b, t, h, w).long().to(device)
+        intermediates = [img]
+        for i in tqdm(reversed(range(0, self.num_timesteps)), desc = 'sampling loop time step'):
+            #assert False, "p_sample_moso"
+            img = self.p_sample_moso(x, mask, torch.full((b,), i, device=device, dtype=torch.long), 
+                context, clip_denoised=self.clip_denoised)
+            mask = mask.view(mask.shape[0], 1, mask.shape[1], mask.shape[2], mask.shape[3]).repeat(1, img.shape[1], 1, 1, 1)
+            img[mask==1] = x[mask==1]
+            mask = mask[:, 0, ...]
+            if i % self.log_every_t == 0 or i == self.num_timesteps - 1:
+                intermediates.append(img)
+        if return_intermediates:
+            return img, intermediates
+        return img
+            
+
 
     def q_sample(self, x_start, t, noise=None):
         noise = default(noise, lambda: torch.randn_like(x_start))
@@ -359,7 +403,7 @@ class DDPM(nn.Module):
 
         return loss
 
-    def p_losses(self, x_start, cond, t, noise=None):
+    def p_losses_old(self, x_start, cond, t, noise=None):
         noise = default(noise, lambda: torch.randn_like(x_start))
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
         model_out = self.model(x_noisy, cond, t)
@@ -387,13 +431,52 @@ class DDPM(nn.Module):
         loss_dict.update({f'{log_prefix}/loss': loss})
 
         return loss, loss_dict
+    
+    def p_losses_moso(self, x_start, cond, t, context, noise=None):
+        noise = default(noise, lambda: torch.randn_like(x_start))
+        cond = cond.view(cond.shape[0], 1, cond.shape[1], cond.shape[2], cond.shape[3]).repeat(1, x_start.shape[1], 1, 1, 1)
+        x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
+        x_noisy[cond == 1] = x_start[cond == 1]
+        cond = cond[:, 0, ...]
+        model_out = self.model(x_noisy, cond, t, context)
 
-    def forward(self, x, cond=None, *args, **kwargs):
+        loss_dict = {}
+        if self.parameterization == "eps":
+            target = noise
+        elif self.parameterization == "x0":
+            target = x_start
+        else:
+            raise NotImplementedError(f"Paramterization {self.parameterization} not yet supported")
+
+        loss = self.get_loss(model_out, target, mean=False)
+        #assert False, [model_out.shape, target.shape, loss.shape]
+        loss = loss.mean(dim=[1, 2, 3, 4])
+
+        log_prefix = 'train' if self.training else 'val'
+
+        loss_dict.update({f'{log_prefix}/loss_simple': loss.mean()})
+        loss_simple = loss.mean() * self.l_simple_weight
+        #assert False, [self.lvlb_weights[t].shape, loss.shape]
+        loss_vlb = (self.lvlb_weights[t] * loss).mean()
+        loss_dict.update({f'{log_prefix}/loss_vlb': loss_vlb})
+
+        loss = loss_simple + self.original_elbo_weight * loss_vlb
+
+        loss_dict.update({f'{log_prefix}/loss': loss})
+
+        return loss, loss_dict
+
+    def forward(self, x, cond=None, mode="default", context=None, *args, **kwargs):
         # b, c, h, w, device, img_size, = *x.shape, x.device, self.image_size
         # assert h == img_size and w == img_size, f'height and width of image must be {img_size}'
         t = torch.randint(0, self.num_timesteps, (x.shape[0],), device=x.device).long()
-        return self.p_losses(x, cond, t, *args, **kwargs), t
-
+        if mode == "default":
+            return self.p_losses_old(x, cond, t, *args, **kwargs), t
+        elif mode == "moso":
+            assert context is not None
+            return self.p_losses_moso(x, cond, t, context, *args, **kwargs), t
+        else:
+            raise NotImplementedError(f"sUnknown DDPM mode {mode}!")
     def get_input(self, batch, k):
         x = batch[k]
         if len(x.shape) == 3:

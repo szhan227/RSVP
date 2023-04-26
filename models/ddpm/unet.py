@@ -2,12 +2,14 @@ from abc import abstractmethod
 from functools import partial
 import math
 from typing import Iterable
+from inspect import isfunction
 
 import numpy as np
 import torch
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
+from einops import rearrange, einsum
 
 from models.ddpm.diffusionmodules import (
     checkpoint,
@@ -68,7 +70,7 @@ class TimestepEmbedSequential(nn.Sequential, TimestepBlock):
         for layer in self:
             if isinstance(layer, TimestepBlock):
                 x = layer(x, emb)
-            elif isinstance(layer, SpatialTransformer):
+            elif isinstance(layer, SpatialTransformer) or isinstance(layer, SpatialTemporalTransformer):
                 x = layer(x, context)
             else:
                 x = layer(x)
@@ -306,10 +308,10 @@ class QKVAttentionLegacy(nn.Module):
         q, k, v = qkv.reshape(bs * self.n_heads, ch * 3, length).split(ch, dim=1)
         scale = 1 / math.sqrt(math.sqrt(ch))
         weight = th.einsum(
-            "bct,bcs->bts", q * scale, k * scale
+            q * scale, k * scale, "bct,bcs->bts"
         )  # More stable with f16 than dividing afterwards
         weight = th.softmax(weight.float(), dim=-1).type(weight.dtype)
-        a = th.einsum("bts,bcs->bct", weight, v)
+        a = th.einsum(weight, v, "bts,bcs->bct")
         return a.reshape(bs, -1, length)
 
     @staticmethod
@@ -338,17 +340,174 @@ class QKVAttention(nn.Module):
         q, k, v = qkv.chunk(3, dim=1)
         scale = 1 / math.sqrt(math.sqrt(ch))
         weight = th.einsum(
-            "bct,bcs->bts",
+            
             (q * scale).view(bs * self.n_heads, ch, length),
             (k * scale).view(bs * self.n_heads, ch, length),
+            "bct,bcs->bts"
         )  # More stable with f16 than dividing afterwards
         weight = th.softmax(weight.float(), dim=-1).type(weight.dtype)
-        a = th.einsum("bts,bcs->bct", weight, v.reshape(bs * self.n_heads, ch, length))
+        a = th.einsum(weight, v.reshape(bs * self.n_heads, ch, length), "bts,bcs->bct", )
         return a.reshape(bs, -1, length)
 
     @staticmethod
     def count_flops(model, _x, y):
         return count_flops_attn(model, _x, y)
+
+
+# feedforward
+class GEGLU(nn.Module):
+    def __init__(self, dim_in, dim_out):
+        super().__init__()
+        self.proj = nn.Linear(dim_in, dim_out * 2)
+
+    def forward(self, x):
+        x, gate = self.proj(x).chunk(2, dim=-1)
+        return x * F.gelu(gate)
+
+
+class FeedForward(nn.Module):
+    def __init__(self, dim, dim_out=None, mult=4, glu=False, dropout=0.):
+        super().__init__()
+        inner_dim = int(dim * mult)
+        dim_out = default(dim_out, dim)
+        project_in = nn.Sequential(
+            nn.Linear(dim, inner_dim),
+            nn.GELU()
+        ) if not glu else GEGLU(dim, inner_dim)
+
+        self.net = nn.Sequential(
+            project_in,
+            nn.Dropout(dropout),
+            nn.Linear(inner_dim, dim_out)
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+
+def zero_module(module):
+    """
+    Zero out the parameters of a module and return it.
+    """
+    for p in module.parameters():
+        p.detach().zero_()
+    return module
+
+
+def Normalize(in_channels):
+    return torch.nn.GroupNorm(num_groups=32, num_channels=in_channels, eps=1e-6, affine=True)
+
+
+class CrossAttention(nn.Module):
+    def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0.):
+        super().__init__()
+        inner_dim = dim_head * heads
+        context_dim = default(context_dim, query_dim)
+
+        self.scale = dim_head ** -0.5
+        self.heads = heads
+
+        self.to_q = nn.Linear(query_dim, inner_dim, bias=False)
+        self.to_k = nn.Linear(context_dim, inner_dim, bias=False)
+        self.to_v = nn.Linear(context_dim, inner_dim, bias=False)
+
+        self.to_out = nn.Sequential(
+            nn.Linear(inner_dim, query_dim),
+            nn.Dropout(dropout)
+        )
+
+    def forward(self, x, context=None, mask=None):
+        h = self.heads
+
+        q = self.to_q(x)
+        context = default(context, x)
+        k = self.to_k(context)
+        v = self.to_v(context)
+
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v))
+
+        sim = einsum(q, k, 'b i d, b j d -> b i j') * self.scale
+
+        if exists(mask):
+            mask = rearrange(mask, 'b ... -> b (...)')
+            max_neg_value = -torch.finfo(sim.dtype).max
+            mask = repeat(mask, 'b j -> (b h) () j', h=h)
+            sim.masked_fill_(~mask, max_neg_value)
+
+        # attention, what we cannot get enough of
+        attn = sim.softmax(dim=-1)
+
+        out = einsum(attn, v, 'b i j, b j d -> b i d')
+        out = rearrange(out, '(b h) n d -> b n (h d)', h=h)
+        return self.to_out(out)
+
+def exists(val):
+    return val is not None
+
+def default(val, d):
+    if exists(val):
+        return val
+    return d() if isfunction(d) else d
+
+class BasicTransformerBlock(nn.Module):
+    def __init__(self, dim, n_heads, d_head, dropout=0., context_dim=None, gated_ff=True, checkpoint=True):
+        super().__init__()
+        self.attn1 = CrossAttention(query_dim=dim, heads=n_heads, dim_head=d_head, dropout=dropout)  # is a self-attention
+        self.ff = FeedForward(dim, dropout=dropout, glu=gated_ff)
+        self.attn2 = CrossAttention(query_dim=dim, context_dim=context_dim,
+                                    heads=n_heads, dim_head=d_head, dropout=dropout)  # is self-attn if context is none
+        self.norm1 = nn.LayerNorm(dim)
+        self.norm2 = nn.LayerNorm(dim)
+        self.norm3 = nn.LayerNorm(dim)
+        self.checkpoint = checkpoint
+
+    def forward(self, x, context=None):
+        return checkpoint(self._forward, (x, context), self.parameters(), self.checkpoint)
+
+    def _forward(self, x, context=None):
+        x = self.attn1(self.norm1(x)) + x
+        x = self.attn2(self.norm2(x), context=context) + x
+        x = self.ff(self.norm3(x)) + x
+        return x
+
+
+class SpatialTemporalTransformer(nn.Module):
+    def __init__(self, in_channels, n_heads, d_head,
+                 depth=1, dropout=0., context_dim=None):
+        super().__init__()
+        self.in_channels = in_channels
+        inner_dim = n_heads * d_head
+        self.norm = Normalize(in_channels)
+
+        self.proj_in = nn.Conv3d(in_channels,
+                                 inner_dim,
+                                 kernel_size=1,
+                                 stride=1,
+                                 padding=0)
+
+        self.transformer_blocks = nn.ModuleList(
+            [BasicTransformerBlock(inner_dim, n_heads, d_head, dropout=dropout, context_dim=context_dim)
+                for d in range(depth)]
+        )
+
+        self.proj_out = zero_module(nn.Conv3d(inner_dim,
+                                              in_channels,
+                                              kernel_size=1,
+                                              stride=1,
+                                              padding=0))
+
+    def forward(self, x, context):
+        # note: if no context is given, cross-attention defaults to self-attention
+        b, c, t, h, w = x.shape
+        x_in = x
+        x = self.norm(x)
+        x = self.proj_in(x)
+        x = rearrange(x, 'b c t h w -> b (t h w) c')
+        for block in self.transformer_blocks:
+            x = block(x, context=context)
+        x = rearrange(x, 'b (t h w) c -> b c t h w', t=t, h=h, w=w)
+        x = self.proj_out(x)
+        return x + x_in
 
 class SpatialTransformer(nn.Module):
     """
@@ -466,6 +625,235 @@ class Downsample(nn.Module):
     def forward(self, x):
         assert x.shape[1] == self.channels
         return self.op(x)
+
+class MosoModel(nn.Module):
+    def __init__(
+        self,
+        image_size,
+        in_channels,
+        out_channels,
+        model_channels,
+        attention_resolutions,
+        num_res_blocks,
+        channel_mult,
+        num_heads,
+        use_scale_shift_norm,
+        resblock_updown,
+        use_checkpoint=False,
+        dropout=0,
+        conv_resample=True,
+        use_fp16=False,
+        num_head_channels=-1,
+        legacy=True,
+        transformer_depth=1,
+        ):
+        super().__init__()
+        
+        self.mask_embed = nn.Embedding(num_embeddings=2, embedding_dim=in_channels)
+        
+        self.in_channels = in_channels
+        self.image_size = image_size
+
+        self.model_channels = model_channels
+        self.dtype = th.float16 if use_fp16 else th.float32
+        time_embed_dim = model_channels * 4
+        self.time_embed = nn.Sequential(
+            linear(model_channels, time_embed_dim),
+            nn.SiLU(),
+            linear(time_embed_dim, time_embed_dim),
+        )
+        
+        self.input_blocks = nn.ModuleList(
+            [TimestepEmbedSequential(
+            conv_nd(3, in_channels*2, model_channels, 3, padding=1))]
+        )
+        context_dim = in_channels
+
+        self._feature_size = model_channels
+        input_block_chans = [model_channels]
+        ch = model_channels
+        ds = 1
+        for level, mult in enumerate(channel_mult):
+            for _ in range(num_res_blocks):
+                layers = [
+                    ResBlock(
+                        ch,
+                        time_embed_dim,
+                        dropout,
+                        out_channels=mult * model_channels,
+                        dims=3,
+                        use_checkpoint=use_checkpoint,
+                        use_scale_shift_norm=use_scale_shift_norm,
+                    )
+                ]
+                ch = mult * model_channels
+                if ds in attention_resolutions:
+                    if num_head_channels == -1:
+                        dim_head = ch // num_heads
+                    else:
+                        num_heads = ch // num_head_channels
+                        dim_head = num_head_channels
+                    if legacy:
+                        #num_heads = 1
+                        dim_head = ch // num_heads 
+                    layers.append(
+                        SpatialTemporalTransformer(
+                            ch, num_heads, dim_head, depth=transformer_depth, context_dim=context_dim
+                        )
+                    )
+                self.input_blocks.append(TimestepEmbedSequential(*layers))
+                self._feature_size += ch
+                input_block_chans.append(ch)
+            if level != len(channel_mult) - 1:
+                out_ch = ch
+                self.input_blocks.append(
+                    TimestepEmbedSequential(
+                        ResBlock(
+                            ch,
+                            time_embed_dim,
+                            dropout,
+                            out_channels=out_ch,
+                            dims=3,
+                            use_checkpoint=use_checkpoint,
+                            use_scale_shift_norm=use_scale_shift_norm,
+                            down=True,
+                        )
+                        if resblock_updown
+                        else Downsample(
+                            ch, conv_resample, dims=3, out_channels=out_ch
+                        )
+                    )
+                )
+                ch = out_ch
+                input_block_chans.append(ch)
+                ds *= 2
+                self._feature_size += ch
+
+        if num_head_channels == -1:
+            dim_head = ch // num_heads
+        else:
+            num_heads = ch // num_head_channels
+            dim_head = num_head_channels
+        if legacy:
+            #num_heads = 1
+            dim_head = ch // num_heads 
+        self.middle_block = TimestepEmbedSequential(
+            ResBlock(
+                ch,
+                time_embed_dim,
+                dropout,
+                dims=3,
+                use_checkpoint=use_checkpoint,
+                use_scale_shift_norm=use_scale_shift_norm,
+            ),
+            SpatialTemporalTransformer(
+                ch, num_heads, dim_head, depth=transformer_depth, context_dim=context_dim
+            ),
+            ResBlock(
+                ch,
+                time_embed_dim,
+                dropout,
+                dims=3,
+                use_checkpoint=use_checkpoint,
+                use_scale_shift_norm=use_scale_shift_norm,
+            ),
+        )
+        self._feature_size += ch
+
+        self.output_blocks = nn.ModuleList([])
+        for level, mult in list(enumerate(channel_mult))[::-1]:
+            for i in range(num_res_blocks + 1):
+                ich = input_block_chans.pop() 
+                layers = [
+                    ResBlock(
+                        ch + ich,
+                        time_embed_dim,
+                        dropout,
+                        out_channels=model_channels * mult,
+                        dims=3,
+                        use_checkpoint=use_checkpoint,
+                        use_scale_shift_norm=use_scale_shift_norm,
+                    )
+                ]
+                ch = model_channels * mult
+                if ds in attention_resolutions:
+                    if num_head_channels == -1:
+                        dim_head = ch // num_heads
+                    else:
+                        num_heads = ch // num_head_channels
+                        dim_head = num_head_channels
+                    if legacy:
+                        #num_heads = 1
+                        dim_head = ch // num_heads 
+                    layers.append(
+                        SpatialTemporalTransformer(
+                            ch, num_heads, dim_head, depth=transformer_depth, context_dim=context_dim
+                        )
+                    )
+                if level and i == num_res_blocks:
+                    out_ch = ch
+                    layers.append(
+                        ResBlock(
+                            ch,
+                            time_embed_dim,
+                            dropout,
+                            out_channels=out_ch,
+                            dims=3,
+                            use_checkpoint=use_checkpoint,
+                            use_scale_shift_norm=use_scale_shift_norm,
+                            up=True,
+                        )
+                        if resblock_updown
+                        else Upsample(ch, conv_resample, dims=3, out_channels=out_ch)
+                    )
+                    ds //= 2
+                self.output_blocks.append(TimestepEmbedSequential(*layers))
+                self._feature_size += ch
+
+        self.out = nn.Sequential(
+            normalization(ch),
+            nn.SiLU(),
+            zero_module(conv_nd(3, model_channels, out_channels, 3, padding=1)),
+        )
+
+    def forward(self, x, cond=None, timesteps=None, context=None, y=None,**kwargs):
+        '''
+        x: b, c, ?
+            concate of xbg: b, c, (h*w)
+                    xid: b, c, (h'*w')
+                    xmo: b, c, (t*h''*w'')
+        cond (mask): b, t, h, w
+        context: []
+        '''
+        t_emb = timestep_embedding(timesteps, self.model_channels, repeat_only=False)
+        emb = self.time_embed(t_emb)
+        
+        mask = self.mask_embed(cond) #
+        mask = rearrange(mask, 'b t h w c -> b c t h w')
+        
+        h_mo = x.type(self.dtype)
+        #h_bg = h[:, :, 0:32*32].view(h.size(0), h.size(1), -1)
+        #h_id = h[:, :, 32*32:32*32+16*16].view(h.size(0), h.size(1), -1)
+        #context = rearrange(torch.cat([h_bg, h_id], dim=-1), "b c (h w) -> b (h w) c")
+        
+        #h_mo = h[:, :, 32*32+16*16:32*32+16*16+16*8*8].view(h.size(0), h.size(1), 8, 16, 16)
+        h_mo = th.cat([h_mo, mask], dim=1)
+        #h_mo = self.x_embed(h_mo, emb)
+        
+        hs = []
+        for module in self.input_blocks:
+            h_mo = module(h_mo, emb, context)
+            hs.append(h_mo)
+        
+        h_mo = self.middle_block(h_mo, emb, context)
+       
+        for module in self.output_blocks:
+            h_mo = th.cat([h_mo, hs.pop()], dim=1)
+            h_mo = module(h_mo, emb, context)
+        h_mo = h_mo.type(x.dtype)
+    
+        
+        return self.out(h_mo)
 
 class UNetModel(nn.Module):
     """

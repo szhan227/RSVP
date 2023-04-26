@@ -23,6 +23,7 @@ class Logger(object):
             os.mkdir(logdir)
 
         if len(os.listdir(logdir)) != 0 and ask:
+            assert False, "%s exists!" % logdir
             exit(1)
 
         self.set_dir(logdir)

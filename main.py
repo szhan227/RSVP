@@ -6,6 +6,7 @@ import argparse
 import torch
 from omegaconf import OmegaConf
 
+from exps.moso import moso_diffusion
 from exps.diffusion import diffusion
 from exps.first_stage import first_stage
 
@@ -20,7 +21,6 @@ parser.add_argument('--id', type=str, default='main', help='experiment identifie
 
 """ Args about Data """
 parser.add_argument('--data', type=str, default='UCF101')
-parser.add_argument('--batch_size', type=int, default=24)
 parser.add_argument('--ds', type=int, default=4)
 
 """ Args about Model """
@@ -34,6 +34,16 @@ parser.add_argument('--first_stage_folder', type=str, default='', help='the fold
 parser.add_argument('--first_model', type=str, default='', help='the path of pretrained model')
 parser.add_argument('--scale_lr', action='store_true')
 
+# for MOSO
+parser.add_argument('--moso_config', type=str, help='the path to MOSO VQVAE config file')
+parser.add_argument('--moso_checkpoint', type=str, help='the path to MOSO checkpoint')
+
+def get_opt_from_yaml(path):
+    assert os.path.exists(path), f"{path} must exists!"
+    import yaml
+    with open(path, 'r') as f:
+        opt = yaml.load(f, Loader=yaml.FullLoader)
+    return opt
 
 def main():
     """ Additional args ends here. """
@@ -49,7 +59,46 @@ def main():
     # init and save configs
     
     """ RUN THE EXP """
-    if args.exp == 'ddpm':
+    if args.exp == 'moso_ddpm':
+        
+        #assert False, args.moso_dir
+        config = OmegaConf.load(args.diffusion_config)
+        
+        args.opt = get_opt_from_yaml(args.moso_config)
+        args.opt["checkpoint_path"] = args.moso_checkpoint
+        ''' 
+        # no need to load old first stage model
+        first_stage_config = OmegaConf.load(args.pretrain_config)
+        # instead, read from opt
+        args.res        = first_stage_config.model.params.ddconfig.resolution
+        args.timesteps  = first_stage_config.model.params.ddconfig.timesteps
+        args.skip       = first_stage_config.model.params.ddconfig.skip
+        args.ddconfig   = first_stage_config.model.params.ddconfig
+        args.embed_dim  = first_stage_config.model.params.embed_dim
+        '''
+
+        args.res = args.opt["dataset"]["img_size"]
+        '''
+        # other arguments not set anymore
+        args.timesteps  = config.model.params.timesteps
+        args.skip       = config.model.params.ddconfig.skip
+        args.ddconfig   = config.model.params.ddconfig
+        args.embed_dim  = config.model.params.embed_dim
+        '''
+
+        args.unetconfig = config.model.params.unet_config
+        args.lr         = config.model.base_learning_rate
+        args.scheduler  = config.model.params.scheduler_config        
+        args.ddpmconfig = config.model.params
+        args.cond_model = config.model.cond_model
+
+        if args.n_gpus == 1:
+            moso_diffusion(rank=0, args=args)
+        else:
+            torch.multiprocessing.spawn(fn=moso_diffusion, args=(args, ), nprocs=args.n_gpus)
+
+
+    elif args.exp == 'ddpm':
         config = OmegaConf.load(args.diffusion_config)
         first_stage_config = OmegaConf.load(args.pretrain_config)
 
