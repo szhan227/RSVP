@@ -2,6 +2,7 @@
 import glob
 import numpy as np
 import torch
+import math
 
 
 class UncondTokenLoader:
@@ -75,6 +76,9 @@ class CondTokenLoader(UncondTokenLoader):
             c_toks = torch.unsqueeze(cbg_tokens, dim=1), torch.unsqueeze(cid_tokens, dim=1), cmo_tokens
             x_toks = torch.unsqueeze(xbg_tokens, dim=1), torch.unsqueeze(xid_tokens, dim=1), xmo_tokens
             yield c_toks, x_toks
+
+    def __len__(self):
+        return len(self.data_paths) // self.batch_size
 
 
 if __name__ == '__main__':

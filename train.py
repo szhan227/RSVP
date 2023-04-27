@@ -112,7 +112,7 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
     for epoch in range(num_epochs):
 
         train_loader.reset()
-
+        num_batch = len(train_loader)
         for it, inputs in enumerate(train_loader):
             # if it > 0:
             #     break
@@ -179,6 +179,7 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
 
             loss.backward()
             optimizer.step()
+            losses['diffusion_loss'].update(loss.item(), 1)
 
             if it % 25 == 0 and it > 0:
                 ema(diffusion_wrapper)
@@ -188,12 +189,12 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
                 if logger is not None and rank == 0:
                     logger.scalar_summary('train/diffusion_loss', losses['diffusion_loss'].average, it)
 
-                    logger.log('[Time %.3f] [Diffusion %f]' %
-                         (time.time() - check, losses['diffusion_loss'].average))
+                    # logger.log('[Time %.3f] [Diffusion %f]' %
+                    #      (time.time() - check, losses['diffusion_loss'].average))
 
                 losses = dict()
                 losses['diffusion_loss'] = AverageMeter()
-            logger.info(f'\r[Epoch {epoch}] [Diffusion Loss {loss.item()}]', end='')
+            logger.info(f'\r[Epoch {epoch}] [{it + 1}/{num_batch}] [Diffusion Loss {loss.item()}]', end='')
         print()
 
         # save model to checkpoint every n epoch
