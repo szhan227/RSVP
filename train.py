@@ -139,6 +139,8 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
         train_loader.reset()
 
         for it, inputs in enumerate(train_loader):
+
+            diffusion_wrapper.zero_grad()
             # if it > 0:
             #     break
             if unet.cond_model:
