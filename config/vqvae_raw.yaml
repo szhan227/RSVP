@@ -8,25 +8,26 @@ dataset:
   shuffle: False
   pin_memory: True
   train:
-    idspath: datasets/FaceForensics/frames/train_fps4+8+16+32_ids.json
-    datapath: datasets/FaceForensics/frames
+    idspath: /export2/xu1201/MOSO/data/UCF-101/ucfTrainTestlist/trainlist01.json
+    datapath: /export2/xu1201/MOSO/merged_Token/UCF101/img256_16frames/
   val:
 #    idspath: datasets/FaceForensics/frames/train_val_fps30_ids.json  # when test IS/FID
-    idspath: datasets/FaceForensics/frames/valid_fps32_ids.json
-    datapath: datasets/FaceForensics/frames
+    idspath: /export2/xu1201/MOSO/data/UCF-101/ucfTrainTestlist/testlist01.json
+    datapath: /export2/xu1201/MOSO/merged_Token/UCF101/img256_16frames/
 
 model:
   name: MoCoVQVAE_wCD_shareCB
   pretrain_path: ~
-  checkpoint_path: experiments/MoCoVQVAEwCDsCB_Face_im256_16frames_id4_2022-06-27-16-37-57/MoCoVQVAE_wCD_shareCB_iter80000.pth
-  load_strict: True
+  # checkpoint_path: experiments/MoCoVQVAEwCDsCB_Face_im256_16frames_id4_2022-06-27-16-37-57/MoCoVQVAE_wCD_shareCB_iter80000.pth
+  checkpoint_path: /export2/xu1201/MOSO/MOSO-VQVAE/experiments/MoCoVQVAEwCDsCB_UCF_im256_16frames_id4_2023-04-11-02-08-29/MoCoVQVAE_wCD_shareCB_iter250000.pth
+  load_strict: False
 
   num_hiddens: 256
   num_residual_layers: 4
   num_residual_hiddens: 128
 
   embedding_dim: 256
-  num_embeddings: 24576 # [4096, 8192, ...]
+  num_embeddings: 16384 # [4096, 8192, ...] 24576
 
   ds_content: 3
   ds_motion: 5

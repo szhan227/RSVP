@@ -2,13 +2,12 @@
 import glob
 import numpy as np
 import torch
-import math
 
 
 class UncondTokenLoader:
 
     def __init__(self, data_folder_path, batch_size=1, device='cpu', shuffle=True):
-        paths = glob.glob(data_folder_path + '/*.npy')
+        paths = glob.glob(data_folder_path + '/*/*/*.npy')
         self.data_paths = np.array(paths)
         self.batch_size = batch_size
         self.device = device
@@ -77,9 +76,6 @@ class CondTokenLoader(UncondTokenLoader):
             x_toks = torch.unsqueeze(xbg_tokens, dim=1), torch.unsqueeze(xid_tokens, dim=1), xmo_tokens
             yield c_toks, x_toks
 
-    def __len__(self):
-        return len(self.data_paths) // self.batch_size
-
 
 if __name__ == '__main__':
     # data_folder_path = '../data2'
@@ -87,7 +83,7 @@ if __name__ == '__main__':
     # path = paths[0]
     # data = np.load(path, allow_pickle=True).item()
     # print(data.keys())
-    loader = CondTokenLoader('../data2', batch_size=2)
+    loader = CondTokenLoader('/export2/xu1201/MOSO/merged_Token/UCF101/img256_16frames/train', batch_size=2)
     for batch in loader:
         print(batch)
         break

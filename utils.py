@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-import gdown
+# import gdown
 import time
 
 from einops import rearrange
@@ -149,7 +149,7 @@ def download(id, fname, root=os.path.expanduser('~/.cache/video-diffusion')):
     if os.path.exists(destination):
         return destination
 
-    gdown.download(id=id, output=destination, quiet=False)
+    # gdown.download(id=id, output=destination, quiet=False)
     return destination
 
 
@@ -211,7 +211,17 @@ def make_mixed_pairs(l, t1, t2, given_vid_real, given_vid_fake):
 
     return torch.cat([ret_frame1, ret_frame2, dt], dim=1)
 
+class Dict(dict):
+    __setattr__ = dict.__setitem__
+    __getattr__ = dict.__getitem__
 
+def dict2obj(dictObj):
+    if not isinstance(dictObj, dict):
+        return dictObj
+    d = Dict()
+    for k, v in dictObj.items():
+        d[k] = dict2obj(v)
+    return d
 
 
 global logger

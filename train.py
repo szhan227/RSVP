@@ -1,4 +1,4 @@
-import cv2
+# import cv2
 import torch
 import numpy as np
 import yaml
@@ -12,7 +12,7 @@ from model.ldm.ddpm import DDPM
 from omegaconf import OmegaConf
 from torch.cuda.amp import GradScaler, autocast
 import time
-from utils import AverageMeter, Logger
+from utils import AverageMeter, Logger,dict2obj
 import copy
 from einops import rearrange
 import random
@@ -41,14 +41,38 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
     cond_prob = 0.3
 
 
-    # TODO: should load a pretrained vqvae model, but now we just use a random initialized one.
-    if frozen_vqvae is None:
-        moso_opt = yaml.load(open('config/vqvae_raw.yaml', 'r'), Loader=yaml.FullLoader)
-        moso_model_opt = moso_opt['model']
-        logger.debug('show vqvae config:', moso_model_opt)
-        frozen_vqvae = VQVAEModel(moso_model_opt, moso_opt).to(device)
-    else:
-        logger.info('Load pretrained vqvae model.')
+    # # TODO: should load a pretrained vqvae model, but now we just use a random initialized one.
+    # if frozen_vqvae is None:
+    #     moso_opt = yaml.load(open('config/vqvae_raw.yaml', 'r'), Loader=yaml.FullLoader)
+    #     moso_model_opt = moso_opt['model']
+    #     logger.debug('show vqvae config:', moso_model_opt)
+    #     frozen_vqvae = VQVAEModel(moso_model_opt, moso_opt).to(device)
+    # else:
+    #     logger.info('Load pretrained vqvae model.')
+    
+    moso_opt = dict2obj(yaml.load(open('config/vqvae_raw.yaml', 'r'), Loader=yaml.FullLoader))
+    moso_model_opt = moso_opt['model']
+    logger.debug('show vqvae config:', moso_model_opt)
+    frozen_vqvae = VQVAEModel(moso_model_opt, moso_opt).to(device)
+    if moso_model_opt['checkpoint_path'] is not None:
+        state = torch.load(moso_model_opt['checkpoint_path'], map_location='cpu')
+        start_step = state['steps']
+
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state['state'].items():
+            if 'total_ops' in k or 'total_params' in k:
+                continue
+            if 'perceptual_loss' in k or '_discriminator' in k:
+            # if 'perceptual_loss' in k:
+                continue
+            if k[:7] == 'module.':
+                new_state_dict[k[7:]] = v
+
+        # model.load_state_dict(new_state_dict, strict=False)
+        frozen_vqvae.load_state_dict(new_state_dict, strict=moso_model_opt['load_strict'])
+        logger.info("Successfully load state {} with step {}.".format(moso_model_opt['checkpoint_path'], start_step))
+    
 
     linear_start = 0.0015
     linear_end = 0.0195
@@ -105,6 +129,7 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
 
     if unet.cond_model:
         train_loader = CondTokenLoader(train_data_path, batch_size=batch_size, device=device)
+        # train_loader, train_sampler, valid_loader, valid_sampler = get_dataloader(moso_opt)
         logger.info('Load conditional token dataset.')
     else:
         train_loader = UncondTokenLoader(train_data_path, batch_size=batch_size, device=device)
@@ -112,7 +137,7 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
     for epoch in range(num_epochs):
 
         train_loader.reset()
-        num_batch = len(train_loader)
+
         for it, inputs in enumerate(train_loader):
             # if it > 0:
             #     break
@@ -179,7 +204,6 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
 
             loss.backward()
             optimizer.step()
-            losses['diffusion_loss'].update(loss.item(), 1)
 
             if it % 25 == 0 and it > 0:
                 ema(diffusion_wrapper)
@@ -189,12 +213,12 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
                 if logger is not None and rank == 0:
                     logger.scalar_summary('train/diffusion_loss', losses['diffusion_loss'].average, it)
 
-                    # logger.log('[Time %.3f] [Diffusion %f]' %
-                    #      (time.time() - check, losses['diffusion_loss'].average))
+                    logger.log('[Time %.3f] [Diffusion %f]' %
+                         (time.time() - check, losses['diffusion_loss'].average))
 
                 losses = dict()
                 losses['diffusion_loss'] = AverageMeter()
-            logger.info(f'\r[Epoch {epoch}] [{it + 1}/{num_batch}] [Diffusion Loss {loss.item()}]', end='')
+            logger.info(f'\r[Epoch {epoch}] [Diffusion Loss {loss.item()}]', end='')
         print()
 
         # save model to checkpoint every n epoch
@@ -224,7 +248,7 @@ if __name__ == '__main__':
 
     train(frozen_vqvae=frozen_vqvae,
           unet=None,
-          train_data_path='./data2',
+          train_data_path='/export2/xu1201/MOSO/merged_Token/UCF101/img256_16frames/train',
           num_epochs=args.epochs,
           batch_size=args.batch_size,
           save_every_n_epoch=args.save_n,
