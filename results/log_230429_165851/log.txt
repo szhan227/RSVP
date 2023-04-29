@@ -1,0 +1,42 @@
+DDPM: Running in eps-prediction mode
+Load conditional token dataset.
+[Epoch 0] [1/4] [Diffusion Loss 0.9986423254013062]
+[Epoch 0] [2/4] [Diffusion Loss 0.9992590546607971]
+[Epoch 0] [3/4] [Diffusion Loss 1.0014609098434448]
+[Epoch 0] [4/4] [Diffusion Loss 0.9992591142654419]
+[Epoch 1] [1/4] [Diffusion Loss 0.9988141655921936]
+[Epoch 1] [2/4] [Diffusion Loss 0.9979691505432129]
+[Epoch 1] [3/4] [Diffusion Loss 1.0002591609954834]
+[Epoch 1] [4/4] [Diffusion Loss 0.9933965802192688]
+[Epoch 2] [1/4] [Diffusion Loss 0.996661901473999]
+[Epoch 2] [2/4] [Diffusion Loss 0.9987554550170898]
+[Epoch 2] [3/4] [Diffusion Loss 0.9954131841659546]
+[Epoch 2] [4/4] [Diffusion Loss 0.9991677403450012]
+[Epoch 3] [1/4] [Diffusion Loss 0.996214747428894]
+[Epoch 3] [2/4] [Diffusion Loss 0.9954972863197327]
+[Epoch 3] [3/4] [Diffusion Loss 0.9954625368118286]
+[Epoch 3] [4/4] [Diffusion Loss 0.9952881932258606]
+[Epoch 4] [1/4] [Diffusion Loss 0.9934991002082825]
+[Epoch 4] [2/4] [Diffusion Loss 0.9934637546539307]
+[Epoch 4] [3/4] [Diffusion Loss 0.9924633502960205]
+[Epoch 4] [4/4] [Diffusion Loss 0.9945021867752075]
+[Epoch 5] [1/4] [Diffusion Loss 0.9939085841178894]
+[Epoch 5] [2/4] [Diffusion Loss 0.994667112827301]
+[Epoch 5] [3/4] [Diffusion Loss 0.9920018911361694]
+[Epoch 5] [4/4] [Diffusion Loss 0.9954404830932617]
+[Epoch 6] [1/4] [Diffusion Loss 0.9907651543617249]
+[Epoch 6] [2/4] [Diffusion Loss 0.9907994270324707]
+[Epoch 6] [3/4] [Diffusion Loss 0.9899798631668091]
+[Epoch 6] [4/4] [Diffusion Loss 0.9912884831428528]
+[Epoch 7] [1/4] [Diffusion Loss 0.9912469387054443]
+[Epoch 7] [2/4] [Diffusion Loss 0.990981936454773]
+[Epoch 7] [3/4] [Diffusion Loss 0.99041748046875]
+[Epoch 7] [4/4] [Diffusion Loss 0.9889926910400391]
+[Epoch 8] [1/4] [Diffusion Loss 0.9892123937606812]
+[Epoch 8] [2/4] [Diffusion Loss 0.9872710108757019]
+[Epoch 8] [3/4] [Diffusion Loss 0.9880796074867249]
+[Epoch 8] [4/4] [Diffusion Loss 0.9915842413902283]
+[Epoch 9] [1/4] [Diffusion Loss 0.9886847138404846]
+[Epoch 9] [2/4] [Diffusion Loss 0.9885045289993286]
+[Epoch 9] [3/4] [Diffusion Loss 0.9866740107536316]
+[Epoch 9] [4/4] [Diffusion Loss 0.9887387156486511]

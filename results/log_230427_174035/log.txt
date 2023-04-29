@@ -1,15 +1,0 @@
-DDPM: Running in eps-prediction mode
-Load conditional token dataset.
-[Epoch 0] [1/3] [Diffusion Loss 0.9949766397476196]
-[Epoch 0] [2/3] [Diffusion Loss 0.9984769821166992]
-[Epoch 0] [3/3] [Diffusion Loss 1.0004249811172485]
-[Epoch 1] [1/3] [Diffusion Loss 1.0009604692459106]
-[Epoch 1] [2/3] [Diffusion Loss 0.9959393739700317]
-[Epoch 1] [3/3] [Diffusion Loss 0.998846173286438]
-[Epoch 2] [1/3] [Diffusion Loss 0.9977405071258545]
-[Epoch 2] [2/3] [Diffusion Loss 0.9969972372055054]
-[Epoch 2] [3/3] [Diffusion Loss 0.9946600794792175]
-[Epoch 3] [1/3] [Diffusion Loss 0.9980572462081909]
-[Epoch 3] [2/3] [Diffusion Loss 0.9969872236251831]
-[Epoch 3] [3/3] [Diffusion Loss 0.9957541227340698]
-[Epoch 4] [1/3] [Diffusion Loss 0.9967209100723267]

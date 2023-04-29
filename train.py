@@ -16,7 +16,8 @@ from utils import AverageMeter, Logger,dict2obj
 import copy
 from einops import rearrange
 import random
-from tools.token_dataloader import UncondTokenLoader, CondTokenLoader
+from torch.utils.data import DataLoader
+from tools.token_dataloader import UncondTokenLoader, CondTokenDataset
 import argparse
 import os, csv
 
@@ -128,7 +129,8 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
     diffusion_wrapper.train()
 
     if unet.cond_model:
-        train_loader = CondTokenLoader(train_data_path, batch_size=batch_size, device=device)
+        train_dataset = CondTokenDataset(train_data_path, device=device)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
         # train_loader, train_sampler, valid_loader, valid_sampler = get_dataloader(moso_opt)
         logger.info('Load conditional token dataset.')
     else:
@@ -136,7 +138,7 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
         logger.info('Load unconditional token dataset.')
     for epoch in range(num_epochs):
 
-        train_loader.reset()
+        total_length = len(train_loader)
 
         for it, inputs in enumerate(train_loader):
 
@@ -206,6 +208,7 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
 
             loss.backward()
             optimizer.step()
+            losses['diffusion_loss'].update(loss.item(), 1)
 
             if it % 25 == 0 and it > 0:
                 ema(diffusion_wrapper)
@@ -215,12 +218,12 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
                 if logger is not None and rank == 0:
                     logger.scalar_summary('train/diffusion_loss', losses['diffusion_loss'].average, it)
 
-                    logger.log('[Time %.3f] [Diffusion %f]' %
-                         (time.time() - check, losses['diffusion_loss'].average))
+                    # logger.log('[Time %.3f] [Diffusion %f]' %
+                    #      (time.time() - check, losses['diffusion_loss'].average))
 
                 losses = dict()
                 losses['diffusion_loss'] = AverageMeter()
-            logger.info(f'\r[Epoch {epoch}] [Diffusion Loss {loss.item()}]', end='')
+            logger.info(f'\r[Epoch {epoch}] [{it + 1}/{total_length}] [Diffusion Loss {loss.item()}]', end='')
         print()
 
         # save model to checkpoint every n epoch
@@ -251,6 +254,7 @@ if __name__ == '__main__':
     train(frozen_vqvae=frozen_vqvae,
           unet=None,
           train_data_path='/export2/xu1201/MOSO/merged_Token/UCF101/img256_16frames/train',
+          # train_data_path='./data2',
           num_epochs=args.epochs,
           batch_size=args.batch_size,
           save_every_n_epoch=args.save_n,

@@ -2,6 +2,9 @@
 import glob
 import numpy as np
 import torch
+from torch.utils.data import Dataset, DataLoader
+import os
+# import torch.utils.data as Data
 
 
 class UncondTokenLoader:
@@ -43,38 +46,32 @@ class UncondTokenLoader:
             yield torch.unsqueeze(bg_tokens, dim=1), torch.unsqueeze(id_tokens, dim=1), mo_tokens
 
 
-class CondTokenLoader(UncondTokenLoader):
+class CondTokenDataset(Dataset):
 
-    def __iter__(self):
-        while self.end < len(self.data_paths):
-            batch_paths = self.data_paths[self.start:self.end]
-            cbg_tokens = []
-            cid_tokens = []
-            cmo_tokens = []
-            xbg_tokens = []
-            xid_tokens = []
-            xmo_tokens = []
+    def __init__(self, data_folder_path, device='cpu', shuffle=True):
+        self.data_folder_path = data_folder_path
+        self.device = device
+        self.items = os.listdir(data_folder_path)
 
-            for path in batch_paths:
-                data = np.load(path, allow_pickle=True).item()
-                cbg_tokens.append(data['cbg_tokens'])
-                cid_tokens.append(data['cid_tokens'])
-                cmo_tokens.append(data['cmo_tokens'])
-                xbg_tokens.append(data['bg_tokens'])
-                xid_tokens.append(data['id_tokens'])
-                xmo_tokens.append(data['mo_tokens'])
+    def __len__(self):
+        return len(self.items)
 
-            cbg_tokens = torch.from_numpy(np.array(cbg_tokens)).to(self.device)
-            cid_tokens = torch.from_numpy(np.array(cid_tokens)).to(self.device)
-            cmo_tokens = torch.from_numpy(np.array(cmo_tokens)).to(self.device)
-            xbg_tokens = torch.from_numpy(np.array(xbg_tokens)).to(self.device)
-            xid_tokens = torch.from_numpy(np.array(xid_tokens)).to(self.device)
-            xmo_tokens = torch.from_numpy(np.array(xmo_tokens)).to(self.device)
-            self.end += self.batch_size
-            self.start += self.batch_size
-            c_toks = torch.unsqueeze(cbg_tokens, dim=1), torch.unsqueeze(cid_tokens, dim=1), cmo_tokens
-            x_toks = torch.unsqueeze(xbg_tokens, dim=1), torch.unsqueeze(xid_tokens, dim=1), xmo_tokens
-            yield c_toks, x_toks
+    def __getitem__(self, index):
+
+        path = self.data_folder_path + '/' + self.items[index]
+        data = np.load(path, allow_pickle=True).item()
+        bg_tokens = torch.from_numpy(np.array(data['bg_tokens'])).to(self.device)
+        id_tokens = torch.from_numpy(np.array(data['id_tokens'])).to(self.device)
+        mo_tokens = torch.from_numpy(np.array(data['mo_tokens'])).to(self.device)
+
+        cbg_tokens = torch.from_numpy(np.array(data['cbg_tokens'])).to(self.device)
+        cid_tokens = torch.from_numpy(np.array(data['cid_tokens'])).to(self.device)
+        cmo_tokens = torch.from_numpy(np.array(data['cmo_tokens'])).to(self.device)
+
+        c_toks = torch.unsqueeze(cbg_tokens, dim=0), torch.unsqueeze(cid_tokens, dim=0), cmo_tokens
+        x_toks = torch.unsqueeze(bg_tokens, dim=0), torch.unsqueeze(id_tokens, dim=0), mo_tokens
+
+        return c_toks, x_toks
 
 
 if __name__ == '__main__':
@@ -83,7 +80,19 @@ if __name__ == '__main__':
     # path = paths[0]
     # data = np.load(path, allow_pickle=True).item()
     # print(data.keys())
-    loader = CondTokenLoader('/export2/xu1201/MOSO/merged_Token/UCF101/img256_16frames/train', batch_size=2)
-    for batch in loader:
-        print(batch)
-        break
+
+    # loader = CondTokenLoader('/export2/xu1201/MOSO/merged_Token/UCF101/img256_16frames/train', batch_size=2)
+    # for batch in loader:
+    #     print(batch)
+    #     break
+
+    tokens_dir = '../data2'
+    loader = CondTokenDataset(tokens_dir)
+
+    d = DataLoader(loader, batch_size=3, shuffle=False)
+    # print(len(loader))
+    for it, (c, x) in enumerate(d):
+        cbg_tokens, cid_tokens, cmo_tokens = c
+        xbg_tokens, xid_tokens, xmo_tokens = x
+        print(it, cbg_tokens.shape, cid_tokens.shape, cmo_tokens.shape, xbg_tokens.shape, xid_tokens.shape, xmo_tokens.shape)
+

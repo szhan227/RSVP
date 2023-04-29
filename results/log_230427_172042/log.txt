@@ -1,340 +1,0 @@
-DDPM: Running in eps-prediction mode
-Load conditional token dataset.
-[Time 2.918] [Diffusion 0.999063]
-[Epoch 0] [Diffusion Loss 0.99906325340271]
-[Epoch 0] [Diffusion Loss 1.0002260208129883]
-[Epoch 0] [Diffusion Loss 0.9992237091064453]
-[Time 4.359] [Diffusion 0.999847]
-[Epoch 1] [Diffusion Loss 1.0000903606414795]
-[Epoch 1] [Diffusion Loss 0.9974283576011658]
-[Epoch 1] [Diffusion Loss 0.9977914690971375]
-[Time 5.792] [Diffusion 0.997790]
-[Epoch 2] [Diffusion Loss 0.9981491565704346]
-[Epoch 2] [Diffusion Loss 0.9988117218017578]
-[Epoch 2] [Diffusion Loss 0.9959486722946167]
-[Time 7.238] [Diffusion 0.997857]
-[Epoch 3] [Diffusion Loss 0.9988093972206116]
-[Epoch 3] [Diffusion Loss 0.9961053133010864]
-[Epoch 3] [Diffusion Loss 0.9955396056175232]
-[Time 8.665] [Diffusion 0.995570]
-[Epoch 4] [Diffusion Loss 0.9950650930404663]
-[Epoch 4] [Diffusion Loss 0.9944289922714233]
-[Epoch 4] [Diffusion Loss 0.9946435689926147]
-[Time 10.071] [Diffusion 0.994307]
-[Epoch 5] [Diffusion Loss 0.9938486814498901]
-[Epoch 5] [Diffusion Loss 0.991321325302124]
-[Epoch 5] [Diffusion Loss 0.9929230213165283]
-[Time 11.488] [Diffusion 0.991673]
-[Epoch 6] [Diffusion Loss 0.9907755851745605]
-[Epoch 6] [Diffusion Loss 0.9916633367538452]
-[Epoch 6] [Diffusion Loss 0.9908775687217712]
-[Time 12.922] [Diffusion 0.990927]
-[Epoch 7] [Diffusion Loss 0.9902409315109253]
-[Epoch 7] [Diffusion Loss 0.9880456924438477]
-[Epoch 7] [Diffusion Loss 0.988237738609314]
-[Time 14.345] [Diffusion 0.988881]
-[Epoch 8] [Diffusion Loss 0.9903609156608582]
-[Epoch 8] [Diffusion Loss 0.9910439848899841]
-[Epoch 8] [Diffusion Loss 0.9853034019470215]
-[Time 15.765] [Diffusion 0.987735]
-[Epoch 9] [Diffusion Loss 0.986856997013092]
-[Epoch 9] [Diffusion Loss 0.9858486652374268]
-[Epoch 9] [Diffusion Loss 0.9879758358001709]
-[Time 17.185] [Diffusion 0.986501]
-[Epoch 10] [Diffusion Loss 0.9856785535812378]
-[Epoch 10] [Diffusion Loss 0.9848415851593018]
-[Epoch 10] [Diffusion Loss 0.9847902059555054]
-[Time 18.733] [Diffusion 0.984633]
-[Epoch 11] [Diffusion Loss 0.9842662811279297]
-[Epoch 11] [Diffusion Loss 0.981429934501648]
-[Epoch 11] [Diffusion Loss 0.9832428693771362]
-[Time 20.172] [Diffusion 0.982389]
-[Epoch 12] [Diffusion Loss 0.9824947714805603]
-[Epoch 12] [Diffusion Loss 0.9812663793563843]
-[Epoch 12] [Diffusion Loss 0.9806137084960938]
-[Time 21.613] [Diffusion 0.980748]
-[Epoch 13] [Diffusion Loss 0.9803647398948669]
-[Epoch 13] [Diffusion Loss 0.9790422916412354]
-[Epoch 13] [Diffusion Loss 0.9787243008613586]
-[Time 23.072] [Diffusion 0.978290]
-[Epoch 14] [Diffusion Loss 0.9771032333374023]
-[Epoch 14] [Diffusion Loss 0.9770641326904297]
-[Epoch 14] [Diffusion Loss 0.9765570163726807]
-[Time 24.518] [Diffusion 0.977438]
-[Epoch 15] [Diffusion Loss 0.9786935448646545]
-[Epoch 15] [Diffusion Loss 0.977413535118103]
-[Epoch 15] [Diffusion Loss 0.9755058884620667]
-[Time 25.955] [Diffusion 0.976335]
-[Epoch 16] [Diffusion Loss 0.9760855436325073]
-[Epoch 16] [Diffusion Loss 0.9747159481048584]
-[Epoch 16] [Diffusion Loss 0.9748314619064331]
-[Time 27.386] [Diffusion 0.974668]
-[Epoch 17] [Diffusion Loss 0.9744573831558228]
-[Epoch 17] [Diffusion Loss 0.973928689956665]
-[Epoch 17] [Diffusion Loss 0.9742245674133301]
-[Time 28.818] [Diffusion 0.973117]
-[Epoch 18] [Diffusion Loss 0.9711970090866089]
-[Epoch 18] [Diffusion Loss 0.9693530797958374]
-[Epoch 18] [Diffusion Loss 0.9710655212402344]
-[Time 30.282] [Diffusion 0.970719]
-[Epoch 19] [Diffusion Loss 0.9717398285865784]
-[Epoch 19] [Diffusion Loss 0.9696297645568848]
-[Epoch 19] [Diffusion Loss 0.9684461355209351]
-[Time 31.791] [Diffusion 0.968667]
-[Epoch 20] [Diffusion Loss 0.9679246544837952]
-[Epoch 20] [Diffusion Loss 0.9705844521522522]
-[Epoch 20] [Diffusion Loss 0.9668087363243103]
-[Time 33.416] [Diffusion 0.968086]
-[Epoch 21] [Diffusion Loss 0.9668633937835693]
-[Epoch 21] [Diffusion Loss 0.9705682992935181]
-[Epoch 21] [Diffusion Loss 0.9688414335250854]
-[Time 34.867] [Diffusion 0.968530]
-[Epoch 22] [Diffusion Loss 0.9661806225776672]
-[Epoch 22] [Diffusion Loss 0.9640822410583496]
-[Epoch 22] [Diffusion Loss 0.9664853811264038]
-[Time 36.341] [Diffusion 0.964688]
-[Epoch 23] [Diffusion Loss 0.9634959697723389]
-[Epoch 23] [Diffusion Loss 0.9636619091033936]
-[Epoch 23] [Diffusion Loss 0.9618486166000366]
-[Time 37.804] [Diffusion 0.961928]
-[Epoch 24] [Diffusion Loss 0.960273027420044]
-[Epoch 24] [Diffusion Loss 0.9607406854629517]
-[Epoch 24] [Diffusion Loss 0.9597190618515015]
-[Time 39.283] [Diffusion 0.960397]
-[Epoch 25] [Diffusion Loss 0.9607299566268921]
-[Epoch 25] [Diffusion Loss 0.9575634598731995]
-[Epoch 25] [Diffusion Loss 0.960180401802063]
-[Time 40.742] [Diffusion 0.959369]
-[Epoch 26] [Diffusion Loss 0.9603636860847473]
-[Epoch 26] [Diffusion Loss 0.959911584854126]
-[Epoch 26] [Diffusion Loss 0.956784725189209]
-[Time 42.212] [Diffusion 0.957998]
-[Epoch 27] [Diffusion Loss 0.9572972655296326]
-[Epoch 27] [Diffusion Loss 0.9557667970657349]
-[Epoch 27] [Diffusion Loss 0.9578315615653992]
-[Time 43.667] [Diffusion 0.957215]
-[Epoch 28] [Diffusion Loss 0.958045482635498]
-[Epoch 28] [Diffusion Loss 0.9529690146446228]
-[Epoch 28] [Diffusion Loss 0.9568561315536499]
-[Time 45.129] [Diffusion 0.954919]
-[Epoch 29] [Diffusion Loss 0.9549306631088257]
-[Epoch 29] [Diffusion Loss 0.9514124393463135]
-[Epoch 29] [Diffusion Loss 0.9544773101806641]
-[Time 46.593] [Diffusion 0.952751]
-[Epoch 30] [Diffusion Loss 0.9523643851280212]
-[Epoch 30] [Diffusion Loss 0.9521267414093018]
-[Epoch 30] [Diffusion Loss 0.9525361061096191]
-[Time 48.151] [Diffusion 0.951388]
-[Epoch 31] [Diffusion Loss 0.949500560760498]
-[Epoch 31] [Diffusion Loss 0.9512301683425903]
-[Epoch 31] [Diffusion Loss 0.9478011727333069]
-[Time 49.629] [Diffusion 0.950080]
-[Epoch 32] [Diffusion Loss 0.9512101411819458]
-[Epoch 32] [Diffusion Loss 0.9503196477890015]
-[Epoch 32] [Diffusion Loss 0.949876070022583]
-[Time 51.086] [Diffusion 0.949434]
-[Epoch 33] [Diffusion Loss 0.9481055736541748]
-[Epoch 33] [Diffusion Loss 0.9491101503372192]
-[Epoch 33] [Diffusion Loss 0.9482756853103638]
-[Time 52.556] [Diffusion 0.948917]
-[Epoch 34] [Diffusion Loss 0.949365496635437]
-[Epoch 34] [Diffusion Loss 0.9490328431129456]
-[Epoch 34] [Diffusion Loss 0.946334958076477]
-[Time 54.023] [Diffusion 0.947734]
-[Epoch 35] [Diffusion Loss 0.9478352069854736]
-[Epoch 35] [Diffusion Loss 0.9475955963134766]
-[Epoch 35] [Diffusion Loss 0.9439396858215332]
-[Time 55.501] [Diffusion 0.945627]
-[Epoch 36] [Diffusion Loss 0.9453450441360474]
-[Epoch 36] [Diffusion Loss 0.9426823258399963]
-[Epoch 36] [Diffusion Loss 0.9451392889022827]
-[Time 56.975] [Diffusion 0.943638]
-[Epoch 37] [Diffusion Loss 0.9430936574935913]
-[Epoch 37] [Diffusion Loss 0.9416506290435791]
-[Epoch 37] [Diffusion Loss 0.9433141350746155]
-[Time 58.459] [Diffusion 0.942412]
-[Epoch 38] [Diffusion Loss 0.9422699213027954]
-[Epoch 38] [Diffusion Loss 0.9428215026855469]
-[Epoch 38] [Diffusion Loss 0.9415478706359863]
-[Time 59.951] [Diffusion 0.941627]
-[Epoch 39] [Diffusion Loss 0.9405113458633423]
-[Epoch 39] [Diffusion Loss 0.9405310153961182]
-[Epoch 39] [Diffusion Loss 0.9396863579750061]
-[Time 61.430] [Diffusion 0.939975]
-[Epoch 40] [Diffusion Loss 0.9397073984146118]
-[Epoch 40] [Diffusion Loss 0.9383491277694702]
-[Epoch 40] [Diffusion Loss 0.9401639699935913]
-[Time 63.009] [Diffusion 0.938403]
-[Epoch 41] [Diffusion Loss 0.9366963505744934]
-[Epoch 41] [Diffusion Loss 0.9400798082351685]
-[Epoch 41] [Diffusion Loss 0.9394663572311401]
-[Time 64.524] [Diffusion 0.938804]
-[Epoch 42] [Diffusion Loss 0.9368669986724854]
-[Epoch 42] [Diffusion Loss 0.9369813203811646]
-[Epoch 42] [Diffusion Loss 0.9402487874031067]
-[Time 65.996] [Diffusion 0.938395]
-[Epoch 43] [Diffusion Loss 0.9379544854164124]
-[Epoch 43] [Diffusion Loss 0.9349454641342163]
-[Epoch 43] [Diffusion Loss 0.9344328045845032]
-[Time 67.490] [Diffusion 0.935021]
-[Epoch 44] [Diffusion Loss 0.9356858730316162]
-[Epoch 44] [Diffusion Loss 0.9369659423828125]
-[Epoch 44] [Diffusion Loss 0.935045599937439]
-[Time 68.968] [Diffusion 0.935389]
-[Epoch 45] [Diffusion Loss 0.9341541528701782]
-[Epoch 45] [Diffusion Loss 0.9344435930252075]
-[Epoch 45] [Diffusion Loss 0.9374462366104126]
-[Time 70.460] [Diffusion 0.935653]
-[Epoch 46] [Diffusion Loss 0.9350706338882446]
-[Epoch 46] [Diffusion Loss 0.9328267574310303]
-[Epoch 46] [Diffusion Loss 0.9334793090820312]
-[Time 71.964] [Diffusion 0.933024]
-[Epoch 47] [Diffusion Loss 0.9327660799026489]
-[Epoch 47] [Diffusion Loss 0.9310958385467529]
-[Epoch 47] [Diffusion Loss 0.9325934648513794]
-[Time 73.462] [Diffusion 0.931632]
-[Epoch 48] [Diffusion Loss 0.9312077164649963]
-[Epoch 48] [Diffusion Loss 0.9320929050445557]
-[Epoch 48] [Diffusion Loss 0.9319576621055603]
-[Time 74.951] [Diffusion 0.932400]
-[Epoch 49] [Diffusion Loss 0.9331495761871338]
-[Epoch 49] [Diffusion Loss 0.9295177459716797]
-[Epoch 49] [Diffusion Loss 0.9311935305595398]
-[Time 76.422] [Diffusion 0.929806]
-[Epoch 50] [Diffusion Loss 0.9287080764770508]
-[Epoch 50] [Diffusion Loss 0.9311968088150024]
-[Epoch 50] [Diffusion Loss 0.9297869205474854]
-[Time 77.982] [Diffusion 0.929591]
-[Epoch 51] [Diffusion Loss 0.9277894496917725]
-[Epoch 51] [Diffusion Loss 0.9276363849639893]
-[Epoch 51] [Diffusion Loss 0.927997887134552]
-[Time 79.475] [Diffusion 0.928699]
-[Epoch 52] [Diffusion Loss 0.9304614663124084]
-[Epoch 52] [Diffusion Loss 0.9302907586097717]
-[Epoch 52] [Diffusion Loss 0.9289233684539795]
-[Time 80.976] [Diffusion 0.929621]
-[Epoch 53] [Diffusion Loss 0.929650068283081]
-[Epoch 53] [Diffusion Loss 0.9283316135406494]
-[Epoch 53] [Diffusion Loss 0.9291530847549438]
-[Time 82.471] [Diffusion 0.928000]
-[Epoch 54] [Diffusion Loss 0.9265140295028687]
-[Epoch 54] [Diffusion Loss 0.9254844188690186]
-[Epoch 54] [Diffusion Loss 0.9287201166152954]
-[Time 83.960] [Diffusion 0.927528]
-[Epoch 55] [Diffusion Loss 0.9283807277679443]
-[Epoch 55] [Diffusion Loss 0.9245672821998596]
-[Epoch 55] [Diffusion Loss 0.9252631664276123]
-[Time 85.426] [Diffusion 0.925408]
-[Epoch 56] [Diffusion Loss 0.9263936281204224]
-[Epoch 56] [Diffusion Loss 0.9271062016487122]
-[Epoch 56] [Diffusion Loss 0.9259307980537415]
-[Time 86.902] [Diffusion 0.926327]
-[Epoch 57] [Diffusion Loss 0.9259428977966309]
-[Epoch 57] [Diffusion Loss 0.9265578985214233]
-[Epoch 57] [Diffusion Loss 0.9230156540870667]
-[Time 88.382] [Diffusion 0.924468]
-[Epoch 58] [Diffusion Loss 0.9238289594650269]
-[Epoch 58] [Diffusion Loss 0.9231892824172974]
-[Epoch 58] [Diffusion Loss 0.9234669804573059]
-[Time 89.857] [Diffusion 0.923881]
-[Epoch 59] [Diffusion Loss 0.9249880909919739]
-[Epoch 59] [Diffusion Loss 0.9260721802711487]
-[Epoch 59] [Diffusion Loss 0.9211183786392212]
-[Time 91.338] [Diffusion 0.924451]
-[Epoch 60] [Diffusion Loss 0.9261636734008789]
-[Epoch 60] [Diffusion Loss 0.9227153062820435]
-[Epoch 60] [Diffusion Loss 0.9237868189811707]
-[Time 92.917] [Diffusion 0.923334]
-[Epoch 61] [Diffusion Loss 0.9234983921051025]
-[Epoch 61] [Diffusion Loss 0.9226279854774475]
-[Epoch 61] [Diffusion Loss 0.9200526475906372]
-[Time 94.389] [Diffusion 0.922158]
-[Epoch 62] [Diffusion Loss 0.923793375492096]
-[Epoch 62] [Diffusion Loss 0.9212148189544678]
-[Epoch 62] [Diffusion Loss 0.9229897260665894]
-[Time 95.864] [Diffusion 0.921664]
-[Epoch 63] [Diffusion Loss 0.920786440372467]
-[Epoch 63] [Diffusion Loss 0.9211212396621704]
-[Epoch 63] [Diffusion Loss 0.922430694103241]
-[Time 97.358] [Diffusion 0.922174]
-[Epoch 64] [Diffusion Loss 0.922971248626709]
-[Epoch 64] [Diffusion Loss 0.9201802611351013]
-[Epoch 64] [Diffusion Loss 0.9209972620010376]
-[Time 98.850] [Diffusion 0.921278]
-[Epoch 65] [Diffusion Loss 0.922656238079071]
-[Epoch 65] [Diffusion Loss 0.9211363196372986]
-[Epoch 65] [Diffusion Loss 0.9207220077514648]
-[Time 100.351] [Diffusion 0.920280]
-[Epoch 66] [Diffusion Loss 0.9189807176589966]
-[Epoch 66] [Diffusion Loss 0.922520637512207]
-[Epoch 66] [Diffusion Loss 0.9209994077682495]
-[Time 101.847] [Diffusion 0.921721]
-[Epoch 67] [Diffusion Loss 0.9216423034667969]
-[Epoch 67] [Diffusion Loss 0.91907799243927]
-[Epoch 67] [Diffusion Loss 0.9222894906997681]
-[Time 103.340] [Diffusion 0.920669]
-[Epoch 68] [Diffusion Loss 0.9206395149230957]
-[Epoch 68] [Diffusion Loss 0.9528356790542603]
-[Epoch 68] [Diffusion Loss 0.9176027178764343]
-[Time 104.805] [Diffusion 0.930535]
-[Epoch 69] [Diffusion Loss 0.9211653470993042]
-[Epoch 69] [Diffusion Loss 0.9210354089736938]
-[Epoch 69] [Diffusion Loss 0.9189490079879761]
-[Time 106.272] [Diffusion 0.919887]
-[Epoch 70] [Diffusion Loss 0.9196764826774597]
-[Epoch 70] [Diffusion Loss 0.9190113544464111]
-[Epoch 70] [Diffusion Loss 0.9198750257492065]
-[Time 107.837] [Diffusion 0.920770]
-[Epoch 71] [Diffusion Loss 0.9234241247177124]
-[Epoch 71] [Diffusion Loss 0.918225884437561]
-[Epoch 71] [Diffusion Loss 0.9530516266822815]
-[Time 109.325] [Diffusion 0.929676]
-[Epoch 72] [Diffusion Loss 0.9177497029304504]
-[Epoch 72] [Diffusion Loss 0.919319748878479]
-[Epoch 72] [Diffusion Loss 0.9191799163818359]
-[Time 110.839] [Diffusion 0.919775]
-[Epoch 73] [Diffusion Loss 0.9208261966705322]
-[Epoch 73] [Diffusion Loss 0.9199382066726685]
-[Epoch 73] [Diffusion Loss 0.9236693382263184]
-[Time 112.306] [Diffusion 0.920670]
-[Epoch 74] [Diffusion Loss 0.9184035658836365]
-[Epoch 74] [Diffusion Loss 0.9204901456832886]
-[Epoch 74] [Diffusion Loss 0.919016420841217]
-[Time 113.783] [Diffusion 0.919789]
-[Epoch 75] [Diffusion Loss 0.919858992099762]
-[Epoch 75] [Diffusion Loss 0.9202157855033875]
-[Epoch 75] [Diffusion Loss 0.9230476021766663]
-[Time 115.277] [Diffusion 0.920237]
-[Epoch 76] [Diffusion Loss 0.917446494102478]
-[Epoch 76] [Diffusion Loss 0.9192788600921631]
-[Epoch 76] [Diffusion Loss 0.9201381802558899]
-[Time 116.853] [Diffusion 0.919974]
-[Epoch 77] [Diffusion Loss 0.9205054640769958]
-[Epoch 77] [Diffusion Loss 0.9191304445266724]
-[Epoch 77] [Diffusion Loss 0.9189740419387817]
-[Time 118.475] [Diffusion 0.918776]
-[Epoch 78] [Diffusion Loss 0.9182243943214417]
-[Epoch 78] [Diffusion Loss 0.9192219972610474]
-[Epoch 78] [Diffusion Loss 0.9192134141921997]
-[Time 119.951] [Diffusion 0.919511]
-[Epoch 79] [Diffusion Loss 0.9200962781906128]
-[Epoch 79] [Diffusion Loss 0.9188506603240967]
-[Epoch 79] [Diffusion Loss 0.9218944311141968]
-[Time 121.471] [Diffusion 0.919780]
-[Epoch 80] [Diffusion Loss 0.9185935258865356]
-[Epoch 80] [Diffusion Loss 0.9208039045333862]
-[Epoch 80] [Diffusion Loss 0.9203400611877441]
-[Time 123.100] [Diffusion 0.921472]
-[Epoch 81] [Diffusion Loss 0.9232708811759949]
-[Epoch 81] [Diffusion Loss 0.9205479621887207]
-[Epoch 81] [Diffusion Loss 0.9189395904541016]
-[Time 124.697] [Diffusion 0.919841]
-[Epoch 82] [Diffusion Loss 0.9200344085693359]
-[Epoch 82] [Diffusion Loss 0.9195640087127686]
-[Epoch 82] [Diffusion Loss 0.9193276166915894]
-[Time 126.294] [Diffusion 0.919210]
-[Epoch 83] [Diffusion Loss 0.9187381267547607]
-[Epoch 83] [Diffusion Loss 0.9192147850990295]
-[Epoch 83] [Diffusion Loss 0.9201401472091675]
-[Time 127.941] [Diffusion 0.920976]
-[Epoch 84] [Diffusion Loss 0.9235718250274658]
