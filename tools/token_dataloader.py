@@ -9,13 +9,11 @@ import os
 
 class UncondTokenLoader:
 
-    def __init__(self, data_folder_path, batch_size=1, device='cpu', shuffle=True):
+    def __init__(self, data_folder_path, batch_size=1, device='cpu'):
         paths = glob.glob(data_folder_path + '/*/*/*.npy')
         self.data_paths = np.array(paths)
         self.batch_size = batch_size
         self.device = device
-        if shuffle:
-            self.data_paths = np.random.permutation(self.data_paths)
 
         self.end = self.batch_size
         self.start = 0
@@ -49,16 +47,24 @@ class UncondTokenLoader:
 class CondTokenDataset(Dataset):
 
     def __init__(self, data_folder_path, device='cpu', shuffle=True):
-        self.data_folder_path = data_folder_path
+        self.data_folder_path = data_folder_path + '/'
         self.device = device
-        self.items = os.listdir(data_folder_path)
+
+        self.videos = os.listdir(data_folder_path)
+        self.items = []
+        for cvideo in self.videos:
+            for item in os.listdir(os.path.join(tokens_dir, cvideo)):
+                for item2 in os.listdir(os.path.join(tokens_dir, cvideo, item)):
+                    self.items.append((cvideo, item, item2))
 
     def __len__(self):
         return len(self.items)
 
     def __getitem__(self, index):
 
-        path = self.data_folder_path + '/*/*/' + self.items[index]
+        # path = self.data_folder_path + '/' + self.items[index]
+        path = self.data_folder_path + '/'.join(self.items[index])
+        print('path', path)
         data = np.load(path, allow_pickle=True).item()
         bg_tokens = torch.from_numpy(np.array(data['bg_tokens'])).to(self.device)
         id_tokens = torch.from_numpy(np.array(data['id_tokens'])).to(self.device)
