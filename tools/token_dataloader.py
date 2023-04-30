@@ -58,7 +58,7 @@ class CondTokenDataset(Dataset):
 
     def __getitem__(self, index):
 
-        path = self.data_folder_path + '/' + self.items[index]
+        path = self.data_folder_path + '/*/*/' + self.items[index]
         data = np.load(path, allow_pickle=True).item()
         bg_tokens = torch.from_numpy(np.array(data['bg_tokens'])).to(self.device)
         id_tokens = torch.from_numpy(np.array(data['id_tokens'])).to(self.device)
