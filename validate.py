@@ -106,6 +106,9 @@ def validate(input_batch, condition_batch=None, vqvae=None, diffusion_wrapper=No
         xbg_quantized, xid_quantized, xmo_quantized = vqvae.get_quantized_by_tokens(xbg_toks, xid_toks, xmo_toks)
 
         cbg_toks, cid_toks, cmo_toks = vqvae.extract_tokens([c, cbg, cid, cmo], is_training=False)
+        logger.debug('xbg_toks shape:', xbg_toks.shape)
+        logger.debug('xid_toks shape:', xid_toks.shape)
+        logger.debug('xmo_toks shape:', xmo_toks.shape)
         cbg_quantized, cid_quantized, cmo_quantized = vqvae.get_quantized_by_tokens(cbg_toks, cid_toks, cmo_toks)
 
         xbg_quantized = rearrange(xbg_quantized, 'b t c h w -> b c (t h w)')
@@ -134,7 +137,7 @@ def validate(input_batch, condition_batch=None, vqvae=None, diffusion_wrapper=No
 
 if __name__ == '__main__':
 
-    logger.set_level('info')
+    logger.set_level('debug')
     # TODO: load preprocessed decomposition of input and condition batch, see params in function 'validate'
 
     # batched raw video: (B, 16, 3, 256, 256) -> x, bg, id, mo:  each (B, 16, 3, 256, 256)
