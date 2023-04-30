@@ -253,8 +253,8 @@ if __name__ == '__main__':
 
     train(frozen_vqvae=frozen_vqvae,
           unet=None,
-          # train_data_path='/export2/xu1201/MOSO/merged_Token/UCF101/img256_16frames/train',
-          train_data_path='./data2',
+          train_data_path='/export2/xu1201/MOSO/merged_Token/UCF101/img256_16frames/train',
+          # train_data_path='./data2',
           num_epochs=args.epochs,
           batch_size=args.batch_size,
           save_every_n_epoch=args.save_n,

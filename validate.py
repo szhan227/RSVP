@@ -16,7 +16,7 @@ from utils import AverageMeter, Logger
 import copy
 from einops import rearrange
 import random
-from tools.token_dataloader import UncondTokenLoader, CondTokenLoader
+from tools.token_dataloader import UncondTokenLoader, CondTokenDataset
 
 logger = utils.logger
 
