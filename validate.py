@@ -82,6 +82,13 @@ def validate(input_batch, condition_batch=None, vqvae=None, diffusion_wrapper=No
 
     ddpm_criterion.eval()
 
+    print('betas:', ddpm_criterion.betas)
+    print('alphas:', 1.0 - ddpm_criterion.betas)
+    print('sqrt_alphas_cumprod:', ddpm_criterion.sqrt_alphas_cumprod)
+    print('sqrt_one_minus_alphas_cumprod:', ddpm_criterion.sqrt_one_minus_alphas_cumprod)
+
+    return
+
     ds_bg = unet.ds_bg
     ds_id = unet.ds_id
     ds_mo = unet.ds_mo
@@ -145,9 +152,18 @@ if __name__ == '__main__':
     input_batch = torch.randn(4, 1, 16, 3, 256, 256).to('cuda')
     condition_batch = torch.randn(4, 1, 16, 3, 256, 256).to('cuda')
 
-    # TODO: load models from checkpoints
+    # # TODO: load models from checkpoints
     vqvae = None # load vqvae here
     diffusion_wrapper = None # start from scratch
     output = validate(input_batch, condition_batch, vqvae=vqvae, diffusion_wrapper=diffusion_wrapper, device='cuda')
     print(output.shape)
+
+    # B = 4
+    # num_steps = 5
+    # a_cumprod = torch.tensor([1, 2, 3, 4, 5])
+    # t = torch.randint(0, num_steps, (B,))
+    # print(t)
+    # out = a_cumprod.gather(-1, t)
+    # print(out)
+    # out = out.reshape
 
