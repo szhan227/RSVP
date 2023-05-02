@@ -5,7 +5,7 @@ import torch
 from utils import AverageMeter
 from torchvision.utils import save_image, make_grid
 from einops import rearrange
-from losses.ddpm import DDPM
+from model.ldm.ddpm import DDPM
 
 from evals.fvd.fvd import get_fvd_logits, frechet_distance
 from evals.fvd.download import load_i3d_pretrained
@@ -22,21 +22,44 @@ def save_image_grid(img, fname, drange, grid_size, normalize=True):
         img = np.rint(img).clip(0, 255).astype(np.uint8)
 
     gw, gh = grid_size
-    _N, C, T, H, W = img.shape
-    img = img.reshape(gh, gw, C, T, H, W)
-    img = img.transpose(3, 0, 4, 1, 5, 2)
-    img = img.reshape(T, gh * H, gw * W, C)
+    # _N, C, T, H, W = img.shape
+    _N, B, T, H, W, C = img.shape
+    # img = rearrange(img, "n b t h w c -> n b t c h w")
+    # img = img.reshape(gh, gw, C, T, H, W)
+    # img = img.transpose(3, 0, 4, 1, 5, 2)
+    # img = img.reshape(T, gh * H, gw * W, C)
+    img = img[0][0] # shape (t, h, w, c)
 
-    print (f'Saving Video with {T} frames, img shape {H}, {W}')
+    print (f'Saving Video [{fname}] with {T} frames, img shape {H}, {W}')
 
     assert C in [3]
 
     if C == 3:
-        torchvision.io.write_video(f'{fname[:-3]}mp4', torch.from_numpy(img), fps=16)
+        # torchvision.io.write_video(f'{fname[:-3]}mp4', torch.from_numpy(img), fps=16)
         imgs = [PIL.Image.fromarray(img[i], 'RGB') for i in range(len(img))]
         imgs[0].save(fname, quality=95, save_all=True, append_images=imgs[1:], duration=100, loop=0)
 
     return img
+
+
+def get_visualize_img(img): # img: [B T C H W]
+    # mean = torch.tensor([0.485, 0.456, 0.406])
+    # std = torch.tensor([0.229, 0.224, 0.225])
+    # x = img[:8].detach().cpu() * std[None, None, :, None, None] + \
+    #     mean[None, None, :, None, None]
+    x = img[:8].detach().cpu()
+    show_x = torch.clamp(x, min=0.0, max=1.0)
+    b, t, c, h, w = show_x.shape
+    # get output for fvd calculation
+    show_x = rearrange(show_x, "b t c h w -> b t h w c").numpy() * 255.
+    return show_x.astype(np.uint8)
+
+    # below is old moso visualize
+    show_x = show_x.permute((0, 3, 1, 4, 2)).numpy()
+    show_x = show_x.reshape((b * h, t * w, c)) * 255.
+    show_x = Image.fromarray(show_x.astype(np.uint8)).convert('RGB')
+    return show_x
+
 
 def test_psnr(rank, model, loader, it, logger=None):
     device = torch.device('cuda', rank)
@@ -236,4 +259,180 @@ def test_fvd_ddpm(rank, ema_model, decoder, loader, it, logger=None):
 
     fvd = frechet_distance(fake_embeddings.clone().detach(), real_embeddings.clone().detach())
     return fvd.item()
+
+
+def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None):
+    device = torch.device('cuda', rank)
+
+    losses = dict()
+    losses['fvd'] = AverageMeter()
+    check = time.time()
+
+    # cond_model = ema_model.diffusion_model.cond_model
+
+    diffusion_model = DDPM(ema_model,
+                           channels=ema_model.diffusion_model.in_channels,
+                           image_size=ema_model.diffusion_model.image_size,
+                           sampling_timesteps=100,
+                           w=0.).to(device)
+    real_embeddings = []
+    fake_embeddings = []
+    pred_embeddings = []
+
+    # reals = []
+    # fakes = []
+    # predictions = []
+
+    i3d = load_i3d_pretrained(device)
+    xbgs = []
+    xids = []
+    reals = []
+    contexts = []
+    preds = []
+    xmos = []
+
+    cbgs = []
+    cids = []
+    cmos = []
+
+    num_loop = 4
+    with torch.no_grad():
+        '''
+        fake_loader = [{
+            "bg_tokens": torch.rand(4, 32*32).long(),
+            "id_tokens": torch.rand(4, 16*16).long(),
+            "mo_tokens": torch.rand(4, 16*8*8).long()
+        }]*4
+        for n, inputs in enumerate(fake_loader):
+        '''
+        for n, inputs in enumerate(loader):
+            if n > num_loop:
+                break
+
+            c_toks, x_toks = inputs
+
+            cbg_tokens, cid_tokens, cmo_tokens = c_toks
+            xbg_tokens, xid_tokens, xmo_tokens = x_toks
+
+            # bg_tokens = rearrange(inputs["bg_tokens"], 'B (T H W) -> B T H W', T=1, H=32, W=32).to(device)
+            # id_tokens = rearrange(inputs["id_tokens"], 'B (T H W) -> B T H W', T=1, H=16, W=16).to(device)
+            # mo_tokens = rearrange(inputs["mo_tokens"], 'B (T H W) -> B T H W', H=8, W=8).to(device)
+
+            B = xmo_tokens.shape[0]
+            T = xmo_tokens.shape[1]
+            # vq_bg = first_stage_model._vq_ema.quantize_code(bg_tokens)
+            # vq_id = first_stage_model._vq_ema.quantize_code(id_tokens)
+            # vq_mo = first_stage_model._vq_ema.quantize_code(mo_tokens)
+            #
+            # quantize_bg = first_stage_model._suf_vq_bg(vq_bg)
+            # quantize_id = first_stage_model._suf_vq_id(vq_id)
+            # quantize_mo = first_stage_model._suf_vq_mo(vq_mo)
+
+            xbg_quantized, xid_quantized, xmo_quantized = vqvae.get_quantized_by_tokens(
+                                                                                                 xbg_tokens,
+                                                                                                 xid_tokens,
+                                                                                                 xmo_tokens)
+
+            cbg_quantized, cid_quantized, cmo_quantized = vqvae.get_quantized_by_tokens(
+                                                                                                    cbg_tokens,
+                                                                                                    cid_tokens,
+                                                                                                    cmo_tokens)
+            # assert False, [quantize_bg.shape, quantize_id.shape, quantize_mo.shape]
+            # xbg = rearrange(quantize_bg, "b c h w -> b (h w) c").detach()
+            # xid = rearrange(quantize_id, "b c h w -> b (h w) c").detach()
+            # xmo = rearrange(quantize_mo, "(b t) c h w -> b c t h w", b=xbg.shape[0]).detach()
+
+            xbg_quantized = rearrange(xbg_quantized, 'b t c h w -> b c (t h w)')
+            xid_quantized = rearrange(xid_quantized, 'b t c h w -> b c (t h w)')
+            xmo_quantized = rearrange(xmo_quantized, 'b t c h w -> b c (t h w)')
+            cbg_quantized = rearrange(cbg_quantized, 'b t c h w -> b c (t h w)')
+            cid_quantized = rearrange(cid_quantized, 'b t c h w -> b c (t h w)')
+            cmo_quantized = rearrange(cmo_quantized, 'b t c h w -> b c (t h w)')
+
+            # assert False, [xbg_quantized.shape, xid_quantized.shape, xmo_quantized.shape]
+            # context = torch.cat([xbg, xid], dim=1)
+            # bgs.append(rearrange(xbg, "b (t h w) c -> b t c h w", t=1, h=32, w=32))
+            # ids.append(rearrange(xid, "b (t h w) c -> b t c h w", t=1, h=16, w=16))
+            # gts.append(xmo)
+            # contexts.append(context)
+
+            xbgs.append(xbg_quantized)
+            xids.append(xid_quantized)
+            xmos.append(xmo_quantized)
+            cbgs.append(cbg_quantized)
+            cids.append(cid_quantized)
+            cmos.append(cmo_quantized)
+
+            # real = rearrange(real, 'b t c h w -> b t h w c')
+            # real = real.type(torch.uint8).numpy()
+            # real_embeddings.append(get_fvd_logits(real, i3d=i3d, device=device))
+
+        concat_dim = -1
+        for i in range(min(num_loop, len(cbgs))):
+            print(i)
+
+            ds_bg = diffusion_model.model.diffusion_model.ds_bg
+            ds_id = diffusion_model.model.diffusion_model.ds_id
+            ds_mo = diffusion_model.model.diffusion_model.ds_mo
+            hidden_size = diffusion_model.model.diffusion_model.vae_hidden
+            n_frames = T
+
+            c = torch.cat([cbgs[i], cids[i], cmos[i]], dim=concat_dim)
+            x = torch.cat([xbgs[i], xids[i], xmos[i]], dim=concat_dim)
+            z = diffusion_model.sample(batch_size=B, cond=c)
+
+            logger.debug('here show the shape of sampleing z:', z.shape)
+            # x_rec, _, _ = vqvae._decoder(bgs[i], ids[i], gts[i].permute(0, 2, 1, 3, 4))
+            # x_rec_fake, _, _ = vqvae._decoder(bgs[i], ids[i], z.permute(0, 2, 1, 3, 4))
+            pred_bg_quantized, pred_id_quantized, pred_mo_quantized = vqvae.convert_latent_to_quantized(
+                z, ds_bg, ds_id, ds_mo, hidden_size, n_frames)
+            true_bg_quantized, true_id_quantized, true_mo_quantized = vqvae.convert_latent_to_quantized(
+                x, ds_bg, ds_id, ds_mo, hidden_size, n_frames)
+
+            pred_rec, _, _ = vqvae._decoder(pred_bg_quantized, pred_id_quantized, pred_mo_quantized)
+            real_rec, _, _ = vqvae._decoder(true_bg_quantized, true_id_quantized, true_mo_quantized)
+
+            # print(x_rec.shape, x_rec_fake.shape)
+            pred_rec = get_visualize_img(pred_rec)  # b
+            real_rec = get_visualize_img(real_rec)
+            # AssertionError: [(4, 16, 256, 256, 3), (4, 16, 256, 256, 3)]
+            # assert False, [x_rec.shape, x_rec_fake.shape]
+            real_embeddings.append(get_fvd_logits(real_rec, i3d=i3d, device=device))
+            pred_embeddings.append(get_fvd_logits(pred_rec, i3d=i3d, device=device))
+
+            reals.append(real_rec)
+            preds.append(pred_rec)
+
+    # need to translate N T H W C ->  N, C, T, H, W
+    # reals = np.transpose(np.concatenate(reals), (0, 4, 1, 2, 3))
+    # preds = np.transpose(np.concatenate(preds), (0, 4, 1, 2, 3))
+    reals = np.array(reals)
+
+    real_embeddings = torch.cat(real_embeddings)
+    pred_embeddings = torch.cat(pred_embeddings)
+
+    # reals = rearrange(torch.cat(reals, dim=0), "b c t h w -> b t c h w")
+    # fakes = rearrange(torch.cat(fakes, dim=0), "b c t h w -> b t c h w")
+    # bgs = torch.cat(bgs, dim=0).to(device)
+    # ids = torch.cat(ids, dim=0).to(device)
+
+    # real_embeddings = torch.cat(real_embeddings)
+    # fake_embeddings = torch.cat(fake_embeddings)
+
+    if rank == 0:
+        real_vid = save_image_grid(reals, os.path.join(logger.logdir, f'real_{it}.gif'), drange=[0, 255],
+                                   grid_size=(4, 4))
+        real_vid = np.expand_dims(real_vid, 0).transpose(0, 1, 4, 2, 3)
+
+        pred_vid = save_image_grid(preds, os.path.join(logger.logdir, f'generated_{it}.gif'), drange=[0, 255],
+                                   grid_size=(4, 4))
+        pred_vid = np.expand_dims(pred_vid, 0).transpose(0, 1, 4, 2, 3)
+
+        # logger.video_summary('real', real_vid, it)
+        # logger.video_summary('prediction', pred_vid, it)
+
+
+    fvd = frechet_distance(pred_embeddings.clone().detach(), real_embeddings.clone().detach())
+    return fvd.item()
+
 

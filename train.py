@@ -16,8 +16,9 @@ from utils import AverageMeter, Logger,dict2obj
 import copy
 from einops import rearrange
 import random
+from evals.eval import test_psnr, test_ifvd, test_fvd_ddpm, test_fvd_moso
 from torch.utils.data import DataLoader
-from tools.token_dataloader import UncondTokenLoader, CondTokenDataset
+from tools.token_dataloader import UncondTokenLoader, CondTokenDataset, get_train_valid_loader
 import argparse
 import os, csv
 
@@ -35,7 +36,14 @@ def write_csv(record, path):
         writer.writerow(record)
 
 
-def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, save_every_n_epoch=None, device='cuda'):
+def train(frozen_vqvae,
+          unet,
+          train_data_path,
+          num_epochs=100,
+          batch_size=2,
+          save_every_n_epoch=None,
+          device='cuda',
+          local_test=False):
 
     rank = 0
     ema_model = None
@@ -43,36 +51,37 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
 
 
     # # TODO: should load a pretrained vqvae model, but now we just use a random initialized one.
-    # if frozen_vqvae is None:
-    #     moso_opt = yaml.load(open('config/vqvae_raw.yaml', 'r'), Loader=yaml.FullLoader)
-    #     moso_model_opt = moso_opt['model']
-    #     logger.debug('show vqvae config:', moso_model_opt)
-    #     frozen_vqvae = VQVAEModel(moso_model_opt, moso_opt).to(device)
-    # else:
-    #     logger.info('Load pretrained vqvae model.')
-    
-    moso_opt = dict2obj(yaml.load(open('config/vqvae_raw.yaml', 'r'), Loader=yaml.FullLoader))
-    moso_model_opt = moso_opt['model']
-    logger.debug('show vqvae config:', moso_model_opt)
-    frozen_vqvae = VQVAEModel(moso_model_opt, moso_opt).to(device)
-    if moso_model_opt['checkpoint_path'] is not None:
-        state = torch.load(moso_model_opt['checkpoint_path'], map_location='cpu')
-        start_step = state['steps']
+    if local_test:
+        if frozen_vqvae is None:
+            moso_opt = yaml.load(open('config/vqvae_raw.yaml', 'r'), Loader=yaml.FullLoader)
+            moso_model_opt = moso_opt['model']
+            logger.debug('show vqvae config:', moso_model_opt)
+            frozen_vqvae = VQVAEModel(moso_model_opt, moso_opt).to(device)
+            logger.info('Local Test: initialize a vqvae model.')
 
-        from collections import OrderedDict
-        new_state_dict = OrderedDict()
-        for k, v in state['state'].items():
-            if 'total_ops' in k or 'total_params' in k:
-                continue
-            if 'perceptual_loss' in k or '_discriminator' in k:
-            # if 'perceptual_loss' in k:
-                continue
-            if k[:7] == 'module.':
-                new_state_dict[k[7:]] = v
+    else:
+        moso_opt = dict2obj(yaml.load(open('config/vqvae_raw.yaml', 'r'), Loader=yaml.FullLoader))
+        moso_model_opt = moso_opt['model']
+        logger.debug('show vqvae config:', moso_model_opt)
+        frozen_vqvae = VQVAEModel(moso_model_opt, moso_opt).to(device)
+        if moso_model_opt['checkpoint_path'] is not None:
+            state = torch.load(moso_model_opt['checkpoint_path'], map_location='cpu')
+            start_step = state['steps']
 
-        # model.load_state_dict(new_state_dict, strict=False)
-        frozen_vqvae.load_state_dict(new_state_dict, strict=moso_model_opt['load_strict'])
-        logger.info("Successfully load state {} with step {}.".format(moso_model_opt['checkpoint_path'], start_step))
+            from collections import OrderedDict
+            new_state_dict = OrderedDict()
+            for k, v in state['state'].items():
+                if 'total_ops' in k or 'total_params' in k:
+                    continue
+                if 'perceptual_loss' in k or '_discriminator' in k:
+                # if 'perceptual_loss' in k:
+                    continue
+                if k[:7] == 'module.':
+                    new_state_dict[k[7:]] = v
+
+            # model.load_state_dict(new_state_dict, strict=False)
+            frozen_vqvae.load_state_dict(new_state_dict, strict=moso_model_opt['load_strict'])
+            logger.info("Successfully load state {} with step {}.".format(moso_model_opt['checkpoint_path'], start_step))
 
 
     linear_start = 0.0015
@@ -85,6 +94,10 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
         unet_path = './config/small_unet.yaml'
         ldm_path = './config/ldm_base.yaml'
         unet_config = OmegaConf.load(unet_path).unet_config
+
+        # change model channels for local test to a small number
+        if local_test:
+            unet_config.model_channels = 32
         # unet_config.cond_model = False
         # unet_config = OmegaConf.load(ldm_path).model.params.unet_config
 
@@ -129,13 +142,16 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
     diffusion_wrapper.train()
 
     if unet.cond_model:
-        train_dataset = CondTokenDataset(train_data_path, device=device)
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        # train_dataset = CondTokenDataset(train_data_path, device=device)
+        # train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        train_loader, valid_loader = get_train_valid_loader(train_data_path, batch_size=batch_size, device=device)
         # train_loader, train_sampler, valid_loader, valid_sampler = get_dataloader(moso_opt)
         logger.info('Load conditional token dataset.')
     else:
         train_loader = UncondTokenLoader(train_data_path, batch_size=batch_size, device=device)
         logger.info('Load unconditional token dataset.')
+
+    # start train loop
     for epoch in range(num_epochs):
 
         total_length = len(train_loader)
@@ -223,6 +239,23 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
 
                 losses = dict()
                 losses['diffusion_loss'] = AverageMeter()
+
+            # Currently disable fvd eval during training
+            if False and (it % 10000 == 0 and rank == 0):
+                # logger.set_level('debug')
+                logger.debug('start to eval fvd')
+                torch.save(diffusion_wrapper.state_dict(), f'chkpt/ddpm/ddpm_wrapper_model_{epoch}_{it}.pt')
+                ema.copy_to(ema_model)
+                torch.save(ema_model.state_dict(), f'chkpt/ddpm/ema_{epoch}_{it}.pt')
+                # assert False, "a new test_fvd_ddpm that uses new first_stage_model decoder"
+                fvd = test_fvd_moso(rank, ema_model, frozen_vqvae, valid_loader, it, logger)
+
+                if logger is not None and rank == 0:
+                    logger.scalar_summary('test/fvd', fvd, it)
+
+                    logger.info('[Time %.3f] [FVD %f]' %
+                         (time.time() - check, fvd))
+                # logger.set_level('info')
             logger.info(f'\r[Epoch {epoch}] [{it + 1}/{total_length}] [Diffusion Loss {loss.item()}]', end='')
         print()
 
@@ -238,11 +271,12 @@ def train(frozen_vqvae, unet, train_data_path, num_epochs=100, batch_size=2, sav
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--epochs',     type=int, required=True)
-    parser.add_argument('--batch_size', type=int, required=True)
-    parser.add_argument('--save_n',     type=int, required=True)
+    parser.add_argument('--epochs',     type=int, default=1)
+    parser.add_argument('--batch_size', type=int, default=2)
+    parser.add_argument('--save_n',     type=int, default=10)
     parser.add_argument('--msg_level',  type=str, default='info')
     parser.add_argument('--device',     type=str, default='cuda')
+    parser.add_argument('--local_test', type=bool, default=False)
 
     args = parser.parse_args()
     # # change message level of the logger.
@@ -251,11 +285,14 @@ if __name__ == '__main__':
     # TODO: load your pretrained vqvae model here. Unet = None means to train DDPM from scratch.
     frozen_vqvae = None
 
+    train_data_path = './data2' if args.local_test else '/export2/xu1201/MOSO/merged_Token/UCF101/img256_16frames/train'
+
     train(frozen_vqvae=frozen_vqvae,
           unet=None,
-          train_data_path='/export2/xu1201/MOSO/merged_Token/UCF101/img256_16frames/train',
-          # train_data_path='./data2',
+          train_data_path=train_data_path,
           num_epochs=args.epochs,
           batch_size=args.batch_size,
           save_every_n_epoch=args.save_n,
-          device=args.device)
+          device=args.device,
+          local_test=args.local_test
+          )

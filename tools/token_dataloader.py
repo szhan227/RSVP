@@ -46,16 +46,26 @@ class UncondTokenLoader:
 
 class CondTokenDataset(Dataset):
 
-    def __init__(self, data_folder_path, device='cpu', shuffle=True):
+    # def __init__(self, data_folder_path, device='cpu', shuffle=True):
+    #     self.data_folder_path = data_folder_path + '/'
+    #     self.device = device
+    #
+    #     self.videos = os.listdir(data_folder_path)
+    #     self.items = []
+    #     for cvideo in self.videos:
+    #         for item in os.listdir(os.path.join(tokens_dir, cvideo)):
+    #             for item2 in os.listdir(os.path.join(tokens_dir, cvideo, item)):
+    #                 self.items.append((cvideo, item, item2))
+    #
+    #     if shuffle:
+    #         np.random.shuffle(self.items)
+    #
+    #     num_train = int(len(self.items) * 0.8)
+    #     num_valid = len(self.items) - num_train
+    def __init__(self, items, data_folder_path, device='cpu'):
         self.data_folder_path = data_folder_path + '/'
+        self.items = items
         self.device = device
-
-        self.videos = os.listdir(data_folder_path)
-        self.items = []
-        for cvideo in self.videos:
-            for item in os.listdir(os.path.join(tokens_dir, cvideo)):
-                for item2 in os.listdir(os.path.join(tokens_dir, cvideo, item)):
-                    self.items.append((cvideo, item, item2))
 
     def __len__(self):
         return len(self.items)
@@ -77,6 +87,33 @@ class CondTokenDataset(Dataset):
         x_toks = torch.unsqueeze(bg_tokens, dim=0), torch.unsqueeze(id_tokens, dim=0), mo_tokens
 
         return c_toks, x_toks
+
+
+def get_train_valid_loader(data_folder_path, batch_size, train_valid_split=0.8, device='cpu'):
+    tokens_dir = data_folder_path
+    data_folder_path = data_folder_path + '/'
+    videos = os.listdir(data_folder_path)
+
+    items = []
+    for cvideo in videos:
+        for item in os.listdir(os.path.join(tokens_dir, cvideo)):
+            for item2 in os.listdir(os.path.join(tokens_dir, cvideo, item)):
+                items.append((cvideo, item, item2))
+
+    np.random.shuffle(items)
+
+    num_train = int(len(items) * train_valid_split)
+
+    train_items = items[:num_train]
+    valid_items = items[num_train:]
+
+    train_set = CondTokenDataset(train_items, data_folder_path, device=device)
+    valid_set = CondTokenDataset(valid_items, data_folder_path, device=device)
+
+    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
+    valid_loader = DataLoader(valid_set, batch_size=batch_size, shuffle=False)
+
+    return train_loader, valid_loader
 
 
 if __name__ == '__main__':

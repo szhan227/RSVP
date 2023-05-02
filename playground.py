@@ -34,7 +34,7 @@ def preprocess(num_frames=32):
     xt = torch.tensor(xt) / 127.5 - 1
     xt = xt.permute(0, 3, 1, 2)
     logger.debug('xt.shape:', xt.shape, xt.dtype)
-
+    assert False, 'I am here'
     # TODO: give 32 frames to encode, first half as condition, second half as inputs
     start = 0
 
@@ -590,9 +590,9 @@ if __name__ == '__main__':
 
     # play_with_PVDM_Diffuser()
 
-    play_with_all_process()
+    # play_with_all_process()
     # import glob
-
+    preprocess()
     # data_list = glob.glob('./data/*.npy')
     # for data_path in data_list:
     #     dt = np.load(data_path, allow_pickle=True).item()

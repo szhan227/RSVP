@@ -119,7 +119,8 @@ class DDPM(nn.Module):
         self.clip_denoised = clip_denoised
         self.log_every_t = log_every_t
         self.first_stage_key = first_stage_key
-        self.image_size = 2048  # TODO: treat as argument (res*res + res*s*2)
+        # self.image_size = 2048  # TODO: treat as argument (res*res + res*s*2)
+        self.image_size = 2304  # TODO: treat as argument (res*res + res*s*2)
         self.channels = channels
         self.use_positional_encodings = use_positional_encodings
         self.model = model
@@ -141,6 +142,7 @@ class DDPM(nn.Module):
 
         ''' ddim sampling related parameters '''
         self.sampling_timesteps = default(sampling_timesteps, timesteps) # default num sampling timesteps to number of timesteps at training
+        # self.sampling_timesteps = 1
         assert self.sampling_timesteps <= timesteps
         self.is_ddim_sampling = self.sampling_timesteps < timesteps
         self.ddim_sampling_eta = ddim_sampling_eta

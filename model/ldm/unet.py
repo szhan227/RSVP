@@ -913,6 +913,8 @@ class UNetModel(nn.Module):
 
         h = x.type(self.dtype)
         if cond != None:
+            logger.debug('show h shape: ', h.shape)
+            logger.debug('show cond shape: ', cond.shape)
             h = torch.cat([h, cond], dim=1)
             logger.debug('here concat z and h together in time dimension')
         elif self.cond_model:

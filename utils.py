@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-# import gdown
+import gdown
 import time
 
 from einops import rearrange
@@ -149,7 +149,7 @@ def download(id, fname, root=os.path.expanduser('~/.cache/video-diffusion')):
     if os.path.exists(destination):
         return destination
 
-    # gdown.download(id=id, output=destination, quiet=False)
+    gdown.download(id=id, output=destination, quiet=False)
     return destination
 
 

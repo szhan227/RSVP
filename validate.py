@@ -149,14 +149,14 @@ if __name__ == '__main__':
 
     # batched raw video: (B, 16, 3, 256, 256) -> x, bg, id, mo:  each (B, 16, 3, 256, 256)
 
-    input_batch = torch.randn(4, 1, 16, 3, 256, 256).to('cuda')
-    condition_batch = torch.randn(4, 1, 16, 3, 256, 256).to('cuda')
-
-    # # TODO: load models from checkpoints
-    vqvae = None # load vqvae here
-    diffusion_wrapper = None # start from scratch
-    output = validate(input_batch, condition_batch, vqvae=vqvae, diffusion_wrapper=diffusion_wrapper, device='cuda')
-    print(output.shape)
+    # input_batch = torch.randn(4, 1, 16, 3, 256, 256).to('cuda')
+    # condition_batch = torch.randn(4, 1, 16, 3, 256, 256).to('cuda')
+    #
+    # # # TODO: load models from checkpoints
+    # vqvae = None # load vqvae here
+    # diffusion_wrapper = None # start from scratch
+    # output = validate(input_batch, condition_batch, vqvae=vqvae, diffusion_wrapper=diffusion_wrapper, device='cuda')
+    # print(output.shape)
 
     # B = 4
     # num_steps = 5
@@ -166,4 +166,10 @@ if __name__ == '__main__':
     # out = a_cumprod.gather(-1, t)
     # print(out)
     # out = out.reshape
+    it = 200000
+    rank = 1
+    if it % 10000 == 0 and rank == 0:
+        print('true')
+    else:
+        print('false')
 
