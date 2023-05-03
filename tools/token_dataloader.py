@@ -89,6 +89,25 @@ class CondTokenDataset(Dataset):
         return c_toks, x_toks
 
 
+def get_dataloader(data_folder_path, batch_size, device='cpu'):
+    tokens_dir = data_folder_path
+    data_folder_path = data_folder_path + '/'
+    videos = os.listdir(data_folder_path)
+
+    items = []
+    for cvideo in videos:
+        for item in os.listdir(os.path.join(tokens_dir, cvideo)):
+            for item2 in os.listdir(os.path.join(tokens_dir, cvideo, item)):
+                items.append((cvideo, item, item2))
+
+    # np.random.shuffle(items)
+
+    dataset = CondTokenDataset(items, data_folder_path, device=device)
+
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+    return data_loader
+
 def get_train_valid_loader(data_folder_path, batch_size, train_valid_split=0.8, device='cpu'):
     tokens_dir = data_folder_path
     data_folder_path = data_folder_path + '/'

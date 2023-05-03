@@ -144,7 +144,10 @@ def train(frozen_vqvae,
     if unet.cond_model:
         # train_dataset = CondTokenDataset(train_data_path, device=device)
         # train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        train_loader, valid_loader = get_train_valid_loader(train_data_path, batch_size=batch_size, device=device)
+        train_loader, valid_loader = get_train_valid_loader(train_data_path,
+                                                            batch_size=batch_size,
+                                                            device=device,
+                                                            train_valid_split=1)
         # train_loader, train_sampler, valid_loader, valid_sampler = get_dataloader(moso_opt)
         logger.info('Load conditional token dataset.')
     else:

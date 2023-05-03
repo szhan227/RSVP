@@ -5,6 +5,7 @@ import yaml
 from torchvision import transforms
 from PIL import Image
 import utils
+from utils import dict2obj
 from model.vq_vae.VQVAE import VQVAEModel
 from model.ldm.unet import UNetModel, DiffusionWrapper
 from model.ema import LitEma
@@ -16,7 +17,8 @@ from utils import AverageMeter, Logger
 import copy
 from einops import rearrange
 import random
-from tools.token_dataloader import UncondTokenLoader, CondTokenDataset
+from tools.token_dataloader import UncondTokenLoader, CondTokenDataset, get_dataloader
+from evals.eval import test_fvd_moso
 
 logger = utils.logger
 
@@ -142,34 +144,95 @@ def validate(input_batch, condition_batch=None, vqvae=None, diffusion_wrapper=No
     return x_output
 
 
+def validate_fvd():
+
+    linear_start = 0.0015
+    linear_end = 0.0195
+    log_every_t = 200
+    w = 0.0
+
+    batch_size = 1
+
+    device = 'cuda'
+
+    moso_opt = dict2obj(yaml.load(open('config/vqvae_raw.yaml', 'r'), Loader=yaml.FullLoader))
+    moso_model_opt = moso_opt['model']
+    logger.debug('show vqvae config:', moso_model_opt)
+    frozen_vqvae = VQVAEModel(moso_model_opt, moso_opt).to(device)
+    if moso_model_opt['checkpoint_path'] is not None:
+        state = torch.load(moso_model_opt['checkpoint_path'], map_location='cpu')
+        start_step = state['steps']
+
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state['state'].items():
+            if 'total_ops' in k or 'total_params' in k:
+                continue
+            if 'perceptual_loss' in k or '_discriminator' in k:
+                # if 'perceptual_loss' in k:
+                continue
+            if k[:7] == 'module.':
+                new_state_dict[k[7:]] = v
+
+        # model.load_state_dict(new_state_dict, strict=False)
+        frozen_vqvae.load_state_dict(new_state_dict, strict=moso_model_opt['load_strict'])
+        logger.info("Successfully load state {} with step {}.".format(moso_model_opt['checkpoint_path'], start_step))
+
+        unet_path = './config/small_unet.yaml'
+        unet_config = OmegaConf.load(unet_path).unet_config
+
+        unet_config.ds_bg = moso_model_opt['ds_background']
+        unet_config.ds_id = moso_model_opt['ds_identity']
+        unet_config.ds_mo = moso_model_opt['ds_motion']
+        unet_config.vae_hidden = moso_model_opt['num_hiddens']
+
+        logger.debug(unet_config)
+        unet = UNetModel(**unet_config).to(device)
+
+    diffusion_wrapper = DiffusionWrapper(model=unet, conditioning_key=None).to(device)
+    ddpm_wrapper_state = torch.load('chkpt/ddpm/ddpm_wrapper_model.pt', map_location='cpu')
+    diffusion_wrapper.load_state_dict(ddpm_wrapper_state, strict=False)
+
+    ddpm_criterion = DDPM(diffusion_wrapper,
+                          channels=unet_config.in_channels,
+                          image_size=unet_config.image_size,
+                          linear_start=linear_start,
+                          linear_end=linear_end,
+                          log_every_t=log_every_t,
+                          w=w,
+                          ).to(device)
+
+
+    unet.eval()
+    diffusion_wrapper.eval()
+
+    ema_model = copy.deepcopy(diffusion_wrapper)
+    ema = LitEma(ema_model)
+    ema_model.eval()
+
+    rank = 0
+
+    logger.info('start to eval fvd')
+    check = time.time()
+    # torch.save(diffusion_wrapper.state_dict(), f'chkpt/ddpm/ddpm_wrapper_model_{epoch}_{it}.pt')
+    ema.copy_to(ema_model)
+    # torch.save(ema_model.state_dict(), f'chkpt/ddpm/ema_{epoch}_{it}.pt')
+    # assert False, "a new test_fvd_ddpm that uses new first_stage_model decoder"
+
+    path = '/export2/xu1201/MOSO/merged_Token/UCF101/img256_16frames/valid'
+
+    valid_loader = get_dataloader(data_folder_path=path, batch_size=batch_size, device=device)
+
+    fvd = test_fvd_moso(rank, ema_model, frozen_vqvae, valid_loader, it=0, logger=logger, num_loop=2)
+
+    # if logger is not None and rank == 0:
+    logger.scalar_summary('test/fvd', fvd, 0)
+
+    logger.info('[Time %.3f] [FVD %f]' %
+                (time.time() - check, fvd))
+
+
 if __name__ == '__main__':
 
-    logger.set_level('debug')
-    # TODO: load preprocessed decomposition of input and condition batch, see params in function 'validate'
-
-    # batched raw video: (B, 16, 3, 256, 256) -> x, bg, id, mo:  each (B, 16, 3, 256, 256)
-
-    # input_batch = torch.randn(4, 1, 16, 3, 256, 256).to('cuda')
-    # condition_batch = torch.randn(4, 1, 16, 3, 256, 256).to('cuda')
-    #
-    # # # TODO: load models from checkpoints
-    # vqvae = None # load vqvae here
-    # diffusion_wrapper = None # start from scratch
-    # output = validate(input_batch, condition_batch, vqvae=vqvae, diffusion_wrapper=diffusion_wrapper, device='cuda')
-    # print(output.shape)
-
-    # B = 4
-    # num_steps = 5
-    # a_cumprod = torch.tensor([1, 2, 3, 4, 5])
-    # t = torch.randint(0, num_steps, (B,))
-    # print(t)
-    # out = a_cumprod.gather(-1, t)
-    # print(out)
-    # out = out.reshape
-    it = 200000
-    rank = 1
-    if it % 10000 == 0 and rank == 0:
-        print('true')
-    else:
-        print('false')
-
+    logger.set_level('info')
+    validate_fvd()

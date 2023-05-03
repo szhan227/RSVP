@@ -261,7 +261,7 @@ def test_fvd_ddpm(rank, ema_model, decoder, loader, it, logger=None):
     return fvd.item()
 
 
-def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None):
+def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None, num_loop=1):
     device = torch.device('cuda', rank)
 
     losses = dict()
@@ -295,7 +295,6 @@ def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None):
     cids = []
     cmos = []
 
-    num_loop = 4
     with torch.no_grad():
         '''
         fake_loader = [{
@@ -314,19 +313,8 @@ def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None):
             cbg_tokens, cid_tokens, cmo_tokens = c_toks
             xbg_tokens, xid_tokens, xmo_tokens = x_toks
 
-            # bg_tokens = rearrange(inputs["bg_tokens"], 'B (T H W) -> B T H W', T=1, H=32, W=32).to(device)
-            # id_tokens = rearrange(inputs["id_tokens"], 'B (T H W) -> B T H W', T=1, H=16, W=16).to(device)
-            # mo_tokens = rearrange(inputs["mo_tokens"], 'B (T H W) -> B T H W', H=8, W=8).to(device)
-
             B = xmo_tokens.shape[0]
             T = xmo_tokens.shape[1]
-            # vq_bg = first_stage_model._vq_ema.quantize_code(bg_tokens)
-            # vq_id = first_stage_model._vq_ema.quantize_code(id_tokens)
-            # vq_mo = first_stage_model._vq_ema.quantize_code(mo_tokens)
-            #
-            # quantize_bg = first_stage_model._suf_vq_bg(vq_bg)
-            # quantize_id = first_stage_model._suf_vq_id(vq_id)
-            # quantize_mo = first_stage_model._suf_vq_mo(vq_mo)
 
             xbg_quantized, xid_quantized, xmo_quantized = vqvae.get_quantized_by_tokens(
                                                                                                  xbg_tokens,
@@ -337,10 +325,6 @@ def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None):
                                                                                                     cbg_tokens,
                                                                                                     cid_tokens,
                                                                                                     cmo_tokens)
-            # assert False, [quantize_bg.shape, quantize_id.shape, quantize_mo.shape]
-            # xbg = rearrange(quantize_bg, "b c h w -> b (h w) c").detach()
-            # xid = rearrange(quantize_id, "b c h w -> b (h w) c").detach()
-            # xmo = rearrange(quantize_mo, "(b t) c h w -> b c t h w", b=xbg.shape[0]).detach()
 
             xbg_quantized = rearrange(xbg_quantized, 'b t c h w -> b c (t h w)')
             xid_quantized = rearrange(xid_quantized, 'b t c h w -> b c (t h w)')
@@ -349,13 +333,6 @@ def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None):
             cid_quantized = rearrange(cid_quantized, 'b t c h w -> b c (t h w)')
             cmo_quantized = rearrange(cmo_quantized, 'b t c h w -> b c (t h w)')
 
-            # assert False, [xbg_quantized.shape, xid_quantized.shape, xmo_quantized.shape]
-            # context = torch.cat([xbg, xid], dim=1)
-            # bgs.append(rearrange(xbg, "b (t h w) c -> b t c h w", t=1, h=32, w=32))
-            # ids.append(rearrange(xid, "b (t h w) c -> b t c h w", t=1, h=16, w=16))
-            # gts.append(xmo)
-            # contexts.append(context)
-
             xbgs.append(xbg_quantized)
             xids.append(xid_quantized)
             xmos.append(xmo_quantized)
@@ -363,13 +340,8 @@ def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None):
             cids.append(cid_quantized)
             cmos.append(cmo_quantized)
 
-            # real = rearrange(real, 'b t c h w -> b t h w c')
-            # real = real.type(torch.uint8).numpy()
-            # real_embeddings.append(get_fvd_logits(real, i3d=i3d, device=device))
-
         concat_dim = -1
         for i in range(min(num_loop, len(cbgs))):
-            print(i)
 
             ds_bg = diffusion_model.model.diffusion_model.ds_bg
             ds_id = diffusion_model.model.diffusion_model.ds_id
@@ -411,13 +383,6 @@ def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None):
     real_embeddings = torch.cat(real_embeddings)
     pred_embeddings = torch.cat(pred_embeddings)
 
-    # reals = rearrange(torch.cat(reals, dim=0), "b c t h w -> b t c h w")
-    # fakes = rearrange(torch.cat(fakes, dim=0), "b c t h w -> b t c h w")
-    # bgs = torch.cat(bgs, dim=0).to(device)
-    # ids = torch.cat(ids, dim=0).to(device)
-
-    # real_embeddings = torch.cat(real_embeddings)
-    # fake_embeddings = torch.cat(fake_embeddings)
 
     if rank == 0:
         real_vid = save_image_grid(reals, os.path.join(logger.logdir, f'real_{it}.gif'), drange=[0, 255],
