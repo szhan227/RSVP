@@ -1,0 +1,13 @@
+unet_config:
+  image_size: 32
+  in_channels: 256 # used to be 4
+  out_channels: 256 # used to be 4
+  model_channels: 256 # used to be 32
+  attention_resolutions: [4,2,1]   # 32, 16, 8, 4
+  num_res_blocks: 2
+  channel_mult: [1,2,4,4]  # 32, 16, 8, 4, 2
+  num_heads: 8
+  use_scale_shift_norm: True
+  resblock_updown: True
+  cond_model: True
+#  num_frames: 4

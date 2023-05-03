@@ -1,0 +1,600 @@
+# vq_vae shared_wCD_shareCB
+
+import ipdb
+import wandb
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.distributed as dist
+import numpy as np
+import argparse
+import lpips
+from einops import rearrange, repeat
+from model.vq_vae.VQ_EMA import VectorQuantizerEMA
+from model.vq_vae.Encoder_Motion import Encoder_Motion, Encoder_Motion_TA
+from model.vq_vae.Encoder_Identity import Encoder_Identity
+from model.vq_vae.Encoder_Background import Encoder_Background
+from model.vq_vae.Decoder import Decoder, Decoder_wTA
+from model.vq_vae.IMG_Discriminator import NLayerDiscriminator
+from losses.GAN_loss import hinge_d_loss
+from torchsummary import summary
+import utils
+
+logger = utils.logger
+# try:
+#     from src.losses.GAN_loss import hinge_d_loss
+# except:
+#     from MoCoVQVAE.src.losses.GAN_loss import hinge_d_loss
+from pytorch_msssim import ssim
+
+class VQVAEModel(nn.Module):
+
+    def __init__(self, model_opt, opt):
+        super(VQVAEModel, self).__init__()
+
+        # some parameters
+        num_hiddens = model_opt['num_hiddens']
+        num_residual_layers = model_opt['num_residual_layers']
+        num_residual_hiddens= model_opt['num_residual_hiddens']
+        suf_method = model_opt['suf_method']
+        ds_motion = model_opt['ds_motion']
+        ds_identity = model_opt['ds_identity']
+        ds_background = model_opt['ds_background']
+        num_frames = opt['dataset']['num_frames']
+        num_head = model_opt['num_head']
+        embedding_dim = model_opt['embedding_dim']
+        num_embeddings = model_opt['num_embeddings']
+        commitment_cost = model_opt['commitment_cost']
+        decay = model_opt['decay']
+        augcb = model_opt['if_augcb']
+        ds_content = model_opt['ds_content']
+        self.fix_encoder = model_opt.get('fix_encoder', False)
+        self._fixed_encoder_flag = True if self.fix_encoder else False
+
+        time_head = model_opt.get('time_head', opt['dataset']['num_frames'])
+        logger.debug(f"!!!!!!!!!!! time head: {time_head} !!!!!!!!!!!!!")
+
+        # discriminator
+        self._disc_start_step = opt['train']['disc_start_step']
+        self._discriminator = NLayerDiscriminator(**model_opt['disc_opt'])
+        self._discriminator_loss = hinge_d_loss
+
+        # get LPIPS loss
+        self.perceptual_factor = model_opt['lpips_factor']
+        self.perceptual_loss = None
+
+        # weights for ABS/MSE recon loss and Generator loss
+        self.generator_weight = model_opt['Gen_weight']
+        self.abs_weight = model_opt.get('ABS_weight', 0)
+        self.mse_weight = model_opt.get('MSR_weight', 0)
+        self.ssim_weight = model_opt.get('SSIM_weight', 0)
+        logger.debug(f'!!! ABS_weight: {self.abs_weight}')
+        logger.debug(f'!!! MSE_weight: {self.mse_weight}')
+        logger.debug(f'!!! SSIM_weight: {self.ssim_weight}')
+
+        # Construct model
+        logger.debug('contructing model...')
+        logger.debug('ds_background: ', ds_background)
+        logger.debug('num_hiddens: ', num_hiddens)
+        logger.debug('num_residual_layers: ', num_residual_layers)
+        logger.debug('num_residual_hiddens: ', num_residual_hiddens)
+        logger.debug('suf_method: ', suf_method)
+        logger.debug('n_frames: ', num_frames)
+        self._encoder_bg = Encoder_Background(ds_content=ds_background,
+                                              num_hiddens=num_hiddens,
+                                              num_residual_layers=num_residual_layers,
+                                              num_residual_hiddens=num_residual_hiddens,
+                                              T=num_frames, suf_method=suf_method)
+
+        self._encoder_id = Encoder_Identity(ds_content=ds_identity,
+                                            num_hiddens=num_hiddens,
+                                            num_residual_layers=num_residual_layers,
+                                            num_residual_hiddens=num_residual_hiddens,
+                                            T=num_frames, suf_method=suf_method)
+
+        if model_opt['encoder_mo_type'] is None or model_opt['encoder_mo_type'] == 'default':
+            logger.debug(f"Loading Motion Encoder: Encoder_Motion...")
+            self._encoder_mo = Encoder_Motion(ds_motion=ds_motion,
+                                              num_hiddens=num_hiddens,
+                                              num_residual_layers=num_residual_layers,
+                                              num_residual_hiddens=num_residual_hiddens,
+                                              n_head=num_head, d_model=num_hiddens, d_kv=64,
+                                              time_head=time_head)
+        elif model_opt['encoder_mo_type'].lower() == 'time-agnostic':
+            logger.debug(f"Loading Motion Encoder: Encoder_Motion_TA...")
+            self._encoder_mo = Encoder_Motion_TA(ds_motion=ds_motion,
+                                                 num_hiddens=num_hiddens,
+                                                 num_residual_layers=num_residual_layers,
+                                                 num_residual_hiddens=num_residual_hiddens,
+                                                 n_head=num_head, d_model=num_hiddens, d_kv=64)
+        else:
+            raise ValueError(f"No implemention for encoder_mo_type: {model_opt['encoder_mo_type']}.")
+
+        if model_opt.get('decoder_type', 'default') in ['default', 'decoder_woPA']:
+            self._decoder = Decoder(num_hiddens=num_hiddens,
+                                    num_residual_layers=ds_content,
+                                    num_residual_hiddens=num_residual_hiddens,
+                                    ds_content=ds_content,
+                                    ds_motion=ds_motion,
+                                    ds_identity=ds_identity,
+                                    ds_background=ds_background)
+        elif model_opt.get('decoder_type', 'default') in ['decoder_wTA']:
+            self._decoder = Decoder_wTA(num_hiddens=num_hiddens,
+                                        num_residual_layers=ds_content,
+                                        num_residual_hiddens=num_residual_hiddens,
+                                        ds_content=ds_content,
+                                        ds_motion=ds_motion,
+                                        ds_identity=ds_identity,
+                                        ds_background=ds_background,
+                                        n_head=num_head, d_model=num_hiddens, d_kv=64)
+        else:
+            raise ValueError(f"No implemention for decoder_type: {model_opt.get('decoder_type', 'default')}.")
+
+        self._pre_vq_bg = nn.Conv2d(num_hiddens, embedding_dim,
+                                 kernel_size=1, stride=1, padding=0)
+        self._suf_vq_bg = nn.ConvTranspose2d(embedding_dim, num_hiddens,
+                                          kernel_size=1, stride=1, padding=0)
+        self._pre_vq_id = nn.Conv2d(num_hiddens, embedding_dim,
+                                    kernel_size=1, stride=1, padding=0)
+        self._suf_vq_id = nn.ConvTranspose2d(embedding_dim, num_hiddens,
+                                             kernel_size=1, stride=1, padding=0)
+        self._pre_vq_mo = nn.Conv2d(num_hiddens, embedding_dim,
+                                 kernel_size=1, stride=1, padding=0)
+        self._suf_vq_mo = nn.ConvTranspose2d(embedding_dim, num_hiddens,
+                                          kernel_size=1, stride=1, padding=0)
+
+        self._vq_ema = VectorQuantizerEMA(embedding_dim=embedding_dim,
+                                          num_embeddings=num_embeddings,
+                                          commitment_cost=commitment_cost,
+                                          decay=decay, if_augcb=augcb)
+
+        self._data_variance = 0.0632704
+
+        if self.fix_encoder:
+            logger.debug("!!!!!!WARNING!!!!!!: FIX Encoder!!!")
+            self._fix_encoder()
+
+    def _fix_encoder(self):
+        self._encoder_bg.eval()
+        for p in self._encoder_bg.parameters():
+            p.requires_grad = False
+        self._encoder_id.eval()
+        for p in self._encoder_id.parameters():
+            p.requires_grad = False
+        self._encoder_mo.eval()
+        for p in self._encoder_mo.parameters():
+            p.requires_grad = False
+
+
+    def _decode(self, bg_tokens, id_tokens, mo_tokens):
+        '''
+            bg_tokens: [B, 1, H, W]
+            id_tokens: [B, 1, H, W]
+            mo_tokens: [B, T, H, W]
+        '''
+        B = bg_tokens.shape[0]
+        vq_bg = self._vq_ema.quantize_code(bg_tokens)
+        vq_id = self._vq_ema.quantize_code(id_tokens)
+        vq_mo = self._vq_ema.quantize_code(mo_tokens)
+
+        quantize_bg = self._suf_vq_bg(vq_bg)
+        quantize_id = self._suf_vq_id(vq_id)
+        quantize_mo = self._suf_vq_mo(vq_mo)
+
+        quantize_bg = rearrange(quantize_bg, "(b t) c h w -> b t c h w", b=B)
+        quantize_id = rearrange(quantize_id, "(b t) c h w -> b t c h w", b=B)
+        quantize_mo = rearrange(quantize_mo, "(b t) c h w -> b t c h w", b=B)
+
+        # get recon loss
+        x_rec, _, _ = self._decoder(quantize_bg, quantize_id, quantize_mo)
+        return x_rec
+
+    def _encode_bg(self, x):
+        feat = self._encoder_bg(x)
+        feat = rearrange(feat, "b t c h w -> (b t) c h w")
+        feat = self._pre_vq_bg(feat)
+        vq = self._vq_ema(feat, is_training=False)
+        tokens = vq['encoding_indices'].detach()
+        return tokens
+
+    def _encode_id(self, x):
+        feat = self._encoder_id(x)
+        feat = rearrange(feat, "b t c h w -> (b t) c h w")
+        feat = self._pre_vq_id(feat)
+        vq = self._vq_ema(feat, is_training=False)
+        tokens = vq['encoding_indices'].detach()
+        return tokens
+
+    def _encode_mo(self, x):
+        feat = self._encoder_mo(x)
+        feat = rearrange(feat, 'b t c h w -> (b t) c h w')
+        feat = self._pre_vq_mo(feat)
+        vq = self._vq_ema(feat, is_training=False)
+        tokens = vq['encoding_indices'].detach()
+        return tokens
+
+    def _generater(self, batch, is_training):
+        """
+        MoCoVQVAE
+        x: [B, T, C, H, W]
+        xc: [B, 1, D, H', W']
+        xm: [B, T, D, H', W']
+        """
+        x, xbg, xid, xmo = batch
+        B, _, _, _, _ = xbg.shape
+        feat_bg = self._encoder_bg(xbg)
+        feat_id = self._encoder_id(xid)
+        feat_mo = self._encoder_mo(xmo)
+
+        logger.debug('after encoder feat_bg', feat_bg.shape, feat_bg.dtype)
+        logger.debug('after encoder feat_id', feat_id.shape, feat_id.dtype)
+        logger.debug('after encoder feat_mo', feat_mo.shape, feat_mo.dtype)
+
+        feat_bg = rearrange(feat_bg, "b t c h w -> (b t) c h w")
+        feat_id = rearrange(feat_id, "b t c h w -> (b t) c h w")
+        feat_mo = rearrange(feat_mo, "b t c h w -> (b t) c h w")
+
+        feat_bg = self._pre_vq_bg(feat_bg)
+        feat_id = self._pre_vq_id(feat_id)
+        feat_mo = self._pre_vq_mo(feat_mo)
+
+        logger.debug('after pre_vq feat_bg', feat_bg.shape, feat_bg.dtype)
+        logger.debug('after pre_vq feat_id', feat_id.shape, feat_id.dtype)
+        logger.debug('after pre_vq feat_mo', feat_mo.shape, feat_mo.dtype)
+
+        vq_output_bg = self._vq_ema(feat_bg, is_training=is_training)
+        vq_output_id = self._vq_ema(feat_id, is_training=is_training)
+        vq_output_mo = self._vq_ema(feat_mo, is_training=is_training)
+
+        logger.debug('vq_output_bg')
+        for key in vq_output_bg:
+            logger.debug(key, vq_output_bg[key].shape, vq_output_bg[key].dtype)
+
+        logger.debug('vq_output_id')
+        for key in vq_output_id:
+            logger.debug(key, vq_output_id[key].shape, vq_output_id[key].dtype)
+
+        logger.debug('vq_output_mo')
+        for key in vq_output_mo:
+            logger.debug(key, vq_output_mo[key].shape, vq_output_mo[key].dtype)
+
+        quantize_bg = self._suf_vq_bg(vq_output_bg['quantize'])
+        quantize_id = self._suf_vq_id(vq_output_id['quantize'])
+        quantize_mo = self._suf_vq_mo(vq_output_mo['quantize'])
+
+        quantize_bg = rearrange(quantize_bg, "(b t) c h w -> b t c h w", b=B)
+        quantize_id = rearrange(quantize_id, "(b t) c h w -> b t c h w", b=B)
+        quantize_mo = rearrange(quantize_mo, "(b t) c h w -> b t c h w", b=B)
+
+        # get recon loss
+        x_rec, _, _ = self._decoder(quantize_bg, quantize_id, quantize_mo)
+        abs_loss = torch.abs(x_rec - x).mean()
+        mse_loss = ((x_rec - x)**2).mean()
+        recon_loss = abs_loss * self.abs_weight + mse_loss * self.mse_weight
+
+        # SSIM loss
+        tx = rearrange(x, 'b t c h w -> (b t) c h w')
+        tx_rec = rearrange(x_rec, 'b t c h w -> (b t) c h w')
+
+        #change tx_rec dtype to match tx
+        tx_rec = tx_rec.type(tx.dtype)
+        ssim_val = ssim(tx, tx_rec, data_range=1, size_average=True)
+        recon_loss = recon_loss - ssim_val * self.ssim_weight
+
+        # LPIPS loss
+        if self.perceptual_loss is None:
+            self.perceptual_loss = lpips.LPIPS(net='vgg', pnet_tune=False).to(x.device)
+        p_loss = self.perceptual_loss(tx * 2 - 1, tx_rec * 2 - 1).mean()
+        nll_loss = recon_loss + p_loss * self.perceptual_factor
+
+        # Total Loss
+        loss = nll_loss + vq_output_bg['loss'] + vq_output_id['loss'] + vq_output_mo['loss']
+
+        return {
+            'loss': loss,
+            'nll_loss': nll_loss,
+            'x_rec': x_rec,
+            'quantize_bg': quantize_bg,
+            'quantize_id': quantize_id,
+            'quantize_mo': quantize_mo,
+            'vq_output_bg': vq_output_bg,
+            'vq_output_id': vq_output_id,
+            'vq_output_mo': vq_output_mo,
+            'record_logs':{
+                'ssim_val': ssim_val,
+                'abs_loss': abs_loss,
+                'mse_loss': mse_loss,
+                'rec_loss': recon_loss,
+                'lpips_loss': p_loss,
+                'quant_loss_bg': vq_output_bg['loss'],
+                'quant_loss_id': vq_output_id['loss'],
+                'quant_loss_mo': vq_output_mo['loss'],
+            }
+        }
+
+    def my_encode(self, batch, is_training):
+        x, xbg, xid, xmo = batch
+        B, _, _, _, _ = xbg.shape
+
+        # these three encoders will generate different shpae, now :
+        # bg: 128, 8, 8
+        # id: 128, 4, 4
+        # mo: 128, 2, 2
+        feat_bg = self._encoder_bg(xbg)
+        feat_id = self._encoder_id(xid)
+        feat_mo = self._encoder_mo(xmo)
+
+        logger.debug('feat_bg.shape: ', feat_bg.shape)
+        logger.debug('feat_id.shape: ', feat_id.shape)
+        logger.debug('feat_mo.shape: ', feat_mo.shape)
+
+        feat_bg = rearrange(feat_bg, "b t c h w -> (b t) c h w")
+        feat_id = rearrange(feat_id, "b t c h w -> (b t) c h w")
+        feat_mo = rearrange(feat_mo, "b t c h w -> (b t) c h w")
+
+        feat_bg = self._pre_vq_bg(feat_bg)
+        feat_id = self._pre_vq_id(feat_id)
+        feat_mo = self._pre_vq_mo(feat_mo)
+
+        vq_output_bg = self._vq_ema(feat_bg, is_training=is_training)
+        vq_output_id = self._vq_ema(feat_id, is_training=is_training)
+        vq_output_mo = self._vq_ema(feat_mo, is_training=is_training)
+
+        logger.debug('vq_output_bg:')
+        for key in vq_output_bg:
+            logger.debug(key, vq_output_bg[key].shape, vq_output_bg[key].dtype)
+        logger.debug('vq_output_id:')
+        for key in vq_output_id:
+            logger.debug(key, vq_output_id[key].shape, vq_output_id[key].dtype)
+        logger.debug('vq_output_mo:')
+        for key in vq_output_mo:
+            logger.debug(key, vq_output_mo[key].shape, vq_output_mo[key].dtype)
+
+        quantize_bg = self._suf_vq_bg(vq_output_bg['quantize'])
+        quantize_id = self._suf_vq_id(vq_output_id['quantize'])
+        quantize_mo = self._suf_vq_mo(vq_output_mo['quantize'])
+
+
+        # original code when used for testing
+
+        quantize_bg = rearrange(quantize_bg, "(b t) c h w -> b t c h w", b=B)
+        quantize_id = rearrange(quantize_id, "(b t) c h w -> b t c h w", b=B)
+        quantize_mo = rearrange(quantize_mo, "(b t) c h w -> b t c h w", b=B)
+
+        # start - TODO: To combine the last 3 dimension, so as to fit PVDM ----------
+        # To rearrange to (b, t, c, h, w) before decoding
+        # quantize_bg = rearrange(quantize_bg, "(b t) c h w -> b t (c h w)", b=B)
+        # quantize_id = rearrange(quantize_id, "(b t) c h w -> b t (c h w)", b=B)
+        # quantize_mo = rearrange(quantize_mo, "(b t) c h w -> b t (c h w)", b=B)
+
+        logger.debug('quantize_bg.shape: ', quantize_bg.shape)
+        logger.debug('quantize_id.shape: ', quantize_id.shape)
+        logger.debug('quantize_mo.shape: ', quantize_mo.shape)
+
+        # mo_b, mo_t, mo_lat = quantize_mo.shape
+        # quantize_mo = quantize_mo.reshape((mo_b, mo_t, -1, 2048))
+        #
+        # # also repeat time dimension of bg and id to match the time dimension of mo
+        # bg_b, bg_t, bg_lat = quantize_bg.shape
+        # quantize_bg = quantize_bg.reshape((bg_b, bg_t, -1, 2048))
+        # quantize_bg = quantize_bg.repeat(1, mo_t, 1, 1)
+        #
+        # id_b, id_t, id_lat = quantize_id.shape
+        # quantize_id = quantize_id.reshape((id_b, id_t, -1, 2048))
+        # quantize_id = quantize_id.repeat(1, mo_t, 1, 1)
+
+        # end TODO ---------------------------------------------------------
+
+        return quantize_bg, quantize_id, quantize_mo
+
+
+    def extract_tokens(self, batch, is_training):
+        x, xbg, xid, xmo = batch
+        B, T, _, _, _ = xmo.shape
+
+        # these three encoders will generate different shpae, now :
+        # bg: 128, 8, 8
+        # id: 128, 4, 4
+        # mo: 128, 2, 2
+        feat_bg = self._encoder_bg(xbg)
+        feat_id = self._encoder_id(xid)
+        feat_mo = self._encoder_mo(xmo)
+
+        logger.debug('feat_bg.shape: ', feat_bg.shape)
+        logger.debug('feat_id.shape: ', feat_id.shape)
+        logger.debug('feat_mo.shape: ', feat_mo.shape)
+
+        feat_bg = rearrange(feat_bg, "b t c h w -> (b t) c h w")
+        feat_id = rearrange(feat_id, "b t c h w -> (b t) c h w")
+        feat_mo = rearrange(feat_mo, "b t c h w -> (b t) c h w")
+
+        feat_bg = self._pre_vq_bg(feat_bg)
+        feat_id = self._pre_vq_id(feat_id)
+        feat_mo = self._pre_vq_mo(feat_mo)
+
+        vq_output_bg = self._vq_ema(feat_bg, is_training=is_training)
+        vq_output_id = self._vq_ema(feat_id, is_training=is_training)
+        vq_output_mo = self._vq_ema(feat_mo, is_training=is_training)
+
+        bg_tokens = vq_output_bg['encoding_indices']
+        id_tokens = vq_output_id['encoding_indices']
+        mo_tokens = vq_output_mo['encoding_indices']
+
+        bg_tokens = rearrange(bg_tokens, "(b t) h w -> b t h w", b=B)
+        id_tokens = rearrange(id_tokens, "(b t) h w -> b t h w", b=B)
+        mo_tokens = rearrange(mo_tokens, "(b t) h w -> b t h w", b=B)
+
+        return bg_tokens, id_tokens, mo_tokens
+
+    def get_quantized_by_tokens(self, bg_tokens, id_tokens, mo_tokens):
+        B = bg_tokens.shape[0]
+
+        vq_bg = self._vq_ema.quantize_code(bg_tokens)
+        vq_id = self._vq_ema.quantize_code(id_tokens)
+        vq_mo = self._vq_ema.quantize_code(mo_tokens)
+
+        quantized_bg = self._suf_vq_bg(vq_bg)
+        quantized_id = self._suf_vq_id(vq_id)
+        quantized_mo = self._suf_vq_mo(vq_mo)
+
+        quantized_bg = rearrange(quantized_bg, "(b t) c h w -> b t c h w", b=B)
+        quantized_id = rearrange(quantized_id, "(b t) c h w -> b t c h w", b=B)
+        quantized_mo = rearrange(quantized_mo, "(b t) c h w -> b t c h w", b=B)
+
+        return quantized_bg, quantized_id, quantized_mo
+
+    def get_quantized_by_tokens_with_rearrange(self, bg_tokens, id_tokens, mo_tokens):
+        quantized_bg, quantized_id, quantized_mo = self.get_quantized_by_tokens(bg_tokens, id_tokens, mo_tokens)
+        quantized_bg = rearrange(quantized_bg, 'b t c h w -> b c (t h w)')
+        quantized_id = rearrange(quantized_id, 'b t c h w -> b c (t h w)')
+        quantized_mo = rearrange(quantized_mo, 'b t c h w -> b c (t h w)')
+        return quantized_bg, quantized_id, quantized_mo
+
+    def convert_latent_to_quantized(self, z, ds_b, ds_i, ds_m, hidden_sz, num_frames):
+        # z shape: [B, hidden_sz, xxx]
+        # in our case hidden_sz = 256
+        hbg = wbg = hidden_sz // 2 ** ds_b
+        hig = wig = hidden_sz // 2 ** ds_i
+        hmo = wmo = hidden_sz // 2 ** ds_m
+
+        tbg = tid = 1
+        tmo = num_frames
+        z_bg, z_ig, z_mo = torch.split(z, [hbg * wbg, hig * wig, hmo * wmo * num_frames], dim=-1)
+
+        bg_quantized = rearrange(z_bg, 'b c (t h w) -> b t c h w', t=tbg, h=hbg, w=wbg)
+        ig_quantized = rearrange(z_ig, 'b c (t h w) -> b t c h w', t=tid, h=hig, w=wig)
+        mo_quantized = rearrange(z_mo, 'b c (t h w) -> b t c h w', t=tmo, h=hmo, w=wmo)
+
+        return bg_quantized, ig_quantized, mo_quantized
+
+    def calculate_adaptive_weight(self, nll_loss, g_loss, last_layer):
+        nll_grads = torch.autograd.grad(nll_loss, last_layer, retain_graph=True)[0]
+        g_grads = torch.autograd.grad(g_loss, last_layer, retain_graph=True)[0]
+
+        d_weight = torch.norm(nll_grads) / (torch.norm(g_grads) + 1e-4)
+        d_weight = torch.clamp(d_weight, 0.1, 1e4).detach()
+        return d_weight.detach()
+
+    def forward_step(self, inputs, is_training, optimizer_idx):
+        if optimizer_idx <= 0: # train generator
+            record_logs = {}
+            logs = self._generater(inputs, is_training=is_training)
+            loss, nll_loss, x_rec = logs['loss'], logs['nll_loss'], logs['x_rec']
+            record_logs.update(logs['record_logs'])
+
+            if optimizer_idx == 0:
+                # get discriminator judges, TODO: To Zero grads in train!
+                logits_fake = self._discriminator(x_rec.contiguous())
+                gan_loss = -torch.mean(logits_fake)
+                if self.generator_weight is None:
+                    generator_weight = self.calculate_adaptive_weight(nll_loss, gan_loss,
+                                                                  last_layer=self._decoder._last_layer.weight)
+                else:
+                    generator_weight = self.generator_weight
+                record_logs.update({
+                    'G0_generator_loss': gan_loss,
+                    'G0_0_generator_weight': generator_weight
+                })
+            elif optimizer_idx == -1:
+                gan_loss = torch.tensor(0.0)
+                generator_weight = torch.tensor(0.0)
+            else:
+                raise ValueError(f"No implemention for optimizer_idx: {optimizer_idx}.")
+
+            ret_loss = loss + generator_weight * gan_loss
+
+            return {
+                'loss': ret_loss,
+                'x_rec': x_rec,
+                'quantize_bg': logs['quantize_bg'],
+                'quantize_id': logs['quantize_id'],
+                'quantize_mo': logs['quantize_mo'],
+                'ssim_metric': logs['record_logs']['ssim_val'],
+                'rec_loss': logs['record_logs']['rec_loss'],
+                'lpips_loss': logs['record_logs']['lpips_loss'],
+                'record_logs': record_logs
+            }
+
+        elif optimizer_idx == 1:
+            with torch.no_grad():
+                output = self._generater(inputs, is_training=False)
+            x, _, _, _ = inputs
+            x_rec = output['x_rec']
+            logits_real = self._discriminator(x.contiguous())
+            logits_fake = self._discriminator(x_rec.contiguous())
+
+            gan_loss = self._discriminator_loss(logits_real, logits_fake)
+            return {
+                "loss": gan_loss,
+                "record_logs": {
+                    "G1_discriminator_loss": gan_loss.clone().detach().mean(),
+                    "G1_0_logits_real": logits_real.detach().mean(),
+                    "G1_1_logits_fake": logits_fake.detach().mean()
+                }
+            }
+
+        else:
+            raise ValueError(f"No implemention for optimizer_idx: {optimizer_idx}.")
+
+    def forward(self, inputs, is_training,
+                optimizer=None, iteration=None, wandb_open=False, writer=None):
+        if self._fixed_encoder_flag:
+            self._fix_encoder()
+            self._fixed_encoder_flag = False
+
+        logs = {}
+        if iteration is None:
+            assert is_training is False
+            optimizer_idx = -1 # Not include discriminator
+        elif iteration < self._disc_start_step:
+            optimizer_idx = -1 # Not include discriminator
+        else:
+            optimizer_idx = iteration % 2 # 0: Generator, 1: Discriminator
+
+        output = self.forward_step(inputs, is_training, optimizer_idx=optimizer_idx)
+
+        if (dist.is_initialized() is False or dist.get_rank() == 0) and (is_training and iteration % 9 == 0):
+            logs.update({"learning_rate": optimizer.state_dict()['param_groups'][0]['lr']})
+            logs.update(output['record_logs'])
+            if is_training == True and wandb_open == True:
+                wandb.log(logs, step=iteration)
+
+            if is_training == True and writer is not None:
+                if optimizer_idx <= 0:
+                    writer.add_scalar('train/rec_loss: ', logs['rec_loss'], iteration)
+                    writer.add_scalar('train/quant_loss_bg_loss: ', logs['quant_loss_bg'], iteration)
+                    writer.add_scalar('train/quant_loss_id_loss: ', logs['quant_loss_id'], iteration)
+                    writer.add_scalar('train/quant_loss_mo_loss: ', logs['quant_loss_mo'], iteration)
+                    writer.add_scalar('train/learning_rate: ', logs['learning_rate'], iteration)
+                    if 'G0_generator_loss' in logs.keys():
+                        writer.add_scalar('train/G0_generator_loss: ', logs['G0_generator_loss'], iteration)
+                        writer.add_scalar('train/G0_0_generator_weight: ', logs['G0_0_generator_weight'], iteration)
+                else:
+                    writer.add_scalar('train/G1_discriminator_loss: ', logs['G1_discriminator_loss'], iteration)
+
+        output['optimizer_idx'] = optimizer_idx
+        return output
+
+
+def printkey(keys):
+    for item in keys:
+        logger.debug(item)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="VQVAE2")
+    parser.add_argument('--downsample', default=8, type=int)
+    args = parser.parse_args(args=[])
+
+    model = VQVAEModel(64, 32, 2, 128, 64, 0.25, 0.99, args)
+
+    # model = Decoder(64, 2, 32, 4)
+    # summary(model, input_size=(3, 256, 256))
+
+    # printkey(model.state_dict().keys())
+
+    # input = torch.randn([32, 3, 256, 256])
+    # flops, params = profile(model, inputs=(input,))
+    # logger.debug(flops)
+    # logger.debug(params)
+
+    # params = torch.sum
