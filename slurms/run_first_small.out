@@ -1,0 +1,318 @@
+## SLURM PROLOG ###############################################################
+##    Job ID : 9326302
+##  Job Name : run_first_small.sh
+##  Nodelist : gpu2104
+##      CPUs : 2
+##  Mem/Node : 16384 MB
+## Directory : /gpfs/data/jtompki1/yliang51/PVDM/slurms
+##   Job Started : Wed Mar 22 19:48:01 EDT 2023
+###############################################################################
+module: unloading 'python/3.7.4'
+module: loading 'python/3.8.12_gcc8.3'
+module: python: "To use: module load gcc/8.3"
+module: unloading 'gcc/8.3'
+module: loading 'gcc/8.3'
+module: gcc: "Note: loading the gcc module overrides the gcc version on the system.  If you want to revert to the version of gcc provided by the OS, unload the gcc module."
+module: loading 'cuda/11.1.1'
+module: cuda: To use: module load gcc/10.2
+module: loading 'cudnn/8.2.0'
+module: cudnn: To use: module load cuda/11.1.1 gcc/10.2
+module: loading 'anaconda/3-5.2.0'
+module: anaconda: "See https://docs.ccv.brown.edu/oscar/software/anaconda for potential issues on VNC and batch jobs"
+[2023-03-22 19:48:03.771538] Namespace(amp=True, batch_size=1, data='UCF101', ddconfig={'double_z': False, 'channels': 16, 'resolution': 256, 'timesteps': 16, 'skip': 1, 'in_channels': 3, 'out_ch': 3, 'num_res_blocks': 2, 'attn_resolutions': [], 'splits': 1}, diffusion_config='configs/latent-diffusion/ucf101-ldm-kl-3_res128.yaml', ds=4, embed_dim=4, exp='first_stage', first_model='', first_stage_folder='', id='main', lossconfig={'params': {'disc_start': 100000000}}, lr=0.0001, n_gpus=1, pretrain_config='configs/autoencoder/base.yaml', res=256, resume=False, scale_lr=False, seed=42, skip=1, timesteps=16)
+[2023-03-22 19:48:03.771628] Log path: ./results/first_stage_main_UCF101_42/
+[2023-03-22 19:48:03.771645] Loading dataset UCF101 with resolution 256
+/gpfs/data/jtompki1/yliang51/PVDM/data/UCF-101 1 16
+9537
+9537
+/gpfs/data/jtompki1/yliang51/PVDM/data/UCF-101 1 16
+3783
+3783
+[2023-03-22 19:48:03.923899] Generating model
+loaded pretrained LPIPS loss from ./losses/vgg.pth
+Fail to load scalers. Start from initial point.
+/users/yliang51/data/yliang51/envs/pvdm/lib/python3.7/site-packages/torch/utils/data/dataloader.py:566: UserWarning: This DataLoader will create 4 worker processes in total. Our suggested max number of worker in current system is 2, which is smaller than what this DataLoader is going to create. Please be aware that excessive worker creation might get DataLoader running slow or even freeze, lower the worker number to avoid potential slowness/freeze if necessary.
+  cpuset_checked))
+/users/yliang51/data/yliang51/envs/pvdm/lib/python3.7/site-packages/torchvision/models/_utils.py:209: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and will be removed in 0.15, please use 'weights' instead.
+  f"The parameter '{pretrained_param}' is deprecated since 0.13 and will be removed in 0.15, "
+/users/yliang51/data/yliang51/envs/pvdm/lib/python3.7/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and will be removed in 0.15. The current behavior is equivalent to passing `weights=VGG16_Weights.IMAGENET1K_V1`. You can also use `weights=VGG16_Weights.DEFAULT` to get the most up-to-date weights.
+  warnings.warn(msg)
+/users/yliang51/data/yliang51/envs/pvdm/lib/python3.7/site-packages/torchvision/io/video.py:162: UserWarning: The pts_unit 'pts' gives wrong results. Please use pts_unit 'sec'.
+  warnings.warn("The pts_unit 'pts' gives wrong results. Please use pts_unit 'sec'.")
+/users/yliang51/data/yliang51/envs/pvdm/lib/python3.7/site-packages/torchvision/io/video.py:162: UserWarning: The pts_unit 'pts' gives wrong results. Please use pts_unit 'sec'.
+  warnings.warn("The pts_unit 'pts' gives wrong results. Please use pts_unit 'sec'.")
+/users/yliang51/data/yliang51/envs/pvdm/lib/python3.7/site-packages/torchvision/io/video.py:162: UserWarning: The pts_unit 'pts' gives wrong results. Please use pts_unit 'sec'.
+  warnings.warn("The pts_unit 'pts' gives wrong results. Please use pts_unit 'sec'.")
+/users/yliang51/data/yliang51/envs/pvdm/lib/python3.7/site-packages/torchvision/io/video.py:162: UserWarning: The pts_unit 'pts' gives wrong results. Please use pts_unit 'sec'.
+  warnings.warn("The pts_unit 'pts' gives wrong results. Please use pts_unit 'sec'.")
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 19:50:28.877590] [Time 142.796] [AELoss 1.980358] [DLoss 0.000000] [PSNR 10.273995]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 20:04:51.430705] [Time 1005.350] [AELoss 1.424910] [DLoss 0.000000] [PSNR 17.462656]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 20:19:12.633287] [Time 1866.552] [AELoss 1.030528] [DLoss 0.000000] [PSNR 17.788759]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 20:34:04.172924] [Time 2758.092] [AELoss 0.984646] [DLoss 0.000000] [PSNR 18.260995]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 20:48:35.274959] [Time 3629.194] [AELoss 0.943722] [DLoss 0.000000] [PSNR 18.224950]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 21:03:17.033496] [Time 4510.953] [AELoss 0.934127] [DLoss 0.000000] [PSNR 18.106125]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 21:17:36.365770] [Time 5370.285] [AELoss 0.919211] [DLoss 0.000000] [PSNR 18.290162]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 21:31:58.606640] [Time 6232.525] [AELoss 0.904861] [DLoss 0.000000] [PSNR 18.613307]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 21:46:16.455178] [Time 7090.375] [AELoss 0.902748] [DLoss 0.000000] [PSNR 18.629701]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 22:00:35.300378] [Time 7949.219] [AELoss 0.899729] [DLoss 0.000000] [PSNR 18.438513]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 22:14:54.653226] [Time 8808.573] [AELoss 0.896979] [DLoss 0.000000] [PSNR 18.536105]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 22:29:24.124505] [Time 9678.043] [AELoss 0.884502] [DLoss 0.000000] [PSNR 18.475824]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 22:43:48.762985] [Time 10542.683] [AELoss 0.886065] [DLoss 0.000000] [PSNR 18.726715]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 22:58:14.727589] [Time 11408.646] [AELoss 0.862157] [DLoss 0.000000] [PSNR 19.215411]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 23:12:40.739551] [Time 12274.658] [AELoss 0.836622] [DLoss 0.000000] [PSNR 19.523447]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 23:27:22.356342] [Time 13156.276] [AELoss 0.811940] [DLoss 0.000000] [PSNR 19.543818]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 23:41:46.095289] [Time 14020.015] [AELoss 0.792029] [DLoss 0.000000] [PSNR 19.157322]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-22 23:55:58.552940] [Time 14872.472] [AELoss 0.775144] [DLoss 0.000000] [PSNR 19.829334]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 00:10:22.389210] [Time 15736.309] [AELoss 0.772794] [DLoss 0.000000] [PSNR 19.984340]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 00:24:48.838047] [Time 16602.757] [AELoss 0.759798] [DLoss 0.000000] [PSNR 20.005273]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 00:39:19.865362] [Time 17473.784] [AELoss 0.754458] [DLoss 0.000000] [PSNR 19.913036]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 00:53:53.950220] [Time 18347.870] [AELoss 0.754459] [DLoss 0.000000] [PSNR 20.115524]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 01:08:09.159057] [Time 19203.078] [AELoss 0.745461] [DLoss 0.000000] [PSNR 19.835860]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 01:22:36.915702] [Time 20070.835] [AELoss 0.742066] [DLoss 0.000000] [PSNR 20.191060]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 01:36:53.312918] [Time 20927.231] [AELoss 0.737089] [DLoss 0.000000] [PSNR 20.198144]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 01:51:25.292014] [Time 21799.210] [AELoss 0.723210] [DLoss 0.000000] [PSNR 19.898039]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 02:05:54.194017] [Time 22668.113] [AELoss 0.722084] [DLoss 0.000000] [PSNR 20.115845]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 02:20:19.619209] [Time 23533.539] [AELoss 0.721345] [DLoss 0.000000] [PSNR 20.192256]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 02:34:34.445163] [Time 24388.364] [AELoss 0.715732] [DLoss 0.000000] [PSNR 20.204787]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 02:48:59.832023] [Time 25253.751] [AELoss 0.708350] [DLoss 0.000000] [PSNR 20.363946]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 03:03:27.838209] [Time 26121.756] [AELoss 0.703181] [DLoss 0.000000] [PSNR 20.502773]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 03:17:43.072058] [Time 26976.991] [AELoss 0.701950] [DLoss 0.000000] [PSNR 20.214119]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 03:32:05.990915] [Time 27839.910] [AELoss 0.696797] [DLoss 0.000000] [PSNR 20.347835]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 03:46:13.829854] [Time 28687.749] [AELoss 0.689949] [DLoss 0.000000] [PSNR 20.180104]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 04:00:38.990300] [Time 29552.909] [AELoss 0.693721] [DLoss 0.000000] [PSNR 20.473871]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 04:14:56.808238] [Time 30410.728] [AELoss 0.686944] [DLoss 0.000000] [PSNR 20.596223]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 04:29:08.107561] [Time 31262.026] [AELoss 0.683414] [DLoss 0.000000] [PSNR 20.574941]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 04:43:33.762567] [Time 32127.682] [AELoss 0.680746] [DLoss 0.000000] [PSNR 20.742583]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 04:57:57.541656] [Time 32991.460] [AELoss 0.675137] [DLoss 0.000000] [PSNR 20.452961]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 05:12:12.892008] [Time 33846.812] [AELoss 0.677665] [DLoss 0.000000] [PSNR 20.353627]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 05:26:42.116029] [Time 34716.035] [AELoss 0.675898] [DLoss 0.000000] [PSNR 20.637934]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 05:41:12.449082] [Time 35586.369] [AELoss 0.668682] [DLoss 0.000000] [PSNR 20.595182]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 05:55:56.168135] [Time 36470.087] [AELoss 0.668000] [DLoss 0.000000] [PSNR 20.800365]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 06:10:24.347417] [Time 37338.267] [AELoss 0.663805] [DLoss 0.000000] [PSNR 20.757415]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 06:25:00.238104] [Time 38214.157] [AELoss 0.655095] [DLoss 0.000000] [PSNR 20.867013]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 06:39:30.077489] [Time 39083.997] [AELoss 0.646168] [DLoss 0.000000] [PSNR 20.754295]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 06:53:47.685579] [Time 39941.605] [AELoss 0.648419] [DLoss 0.000000] [PSNR 20.942518]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 07:08:18.807586] [Time 40812.726] [AELoss 0.639207] [DLoss 0.000000] [PSNR 20.834874]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 07:22:51.835783] [Time 41685.756] [AELoss 0.632352] [DLoss 0.000000] [PSNR 20.975579]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 07:37:03.074976] [Time 42536.994] [AELoss 0.629827] [DLoss 0.000000] [PSNR 21.158586]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 07:51:58.602447] [Time 43432.522] [AELoss 0.623730] [DLoss 0.000000] [PSNR 21.058166]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 08:06:49.232989] [Time 44323.152] [AELoss 0.620958] [DLoss 0.000000] [PSNR 21.253069]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 08:21:17.643492] [Time 45191.562] [AELoss 0.623052] [DLoss 0.000000] [PSNR 20.727890]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 08:35:50.313431] [Time 46064.232] [AELoss 0.615040] [DLoss 0.000000] [PSNR 21.023743]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 08:50:26.285351] [Time 46940.204] [AELoss 0.617408] [DLoss 0.000000] [PSNR 21.193058]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 09:05:15.635092] [Time 47829.555] [AELoss 0.613152] [DLoss 0.000000] [PSNR 21.360193]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 09:19:44.787189] [Time 48698.707] [AELoss 0.605244] [DLoss 0.000000] [PSNR 21.099391]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 09:34:17.734379] [Time 49571.653] [AELoss 0.606865] [DLoss 0.000000] [PSNR 21.333735]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 09:48:47.185742] [Time 50441.104] [AELoss 0.607601] [DLoss 0.000000] [PSNR 21.316935]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 10:03:02.593529] [Time 51296.512] [AELoss 0.595422] [DLoss 0.000000] [PSNR 21.463615]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 10:17:30.912663] [Time 52164.832] [AELoss 0.606656] [DLoss 0.000000] [PSNR 21.499877]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 10:31:56.976398] [Time 53030.895] [AELoss 0.603632] [DLoss 0.000000] [PSNR 21.183050]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 10:46:35.937711] [Time 53909.857] [AELoss 0.590821] [DLoss 0.000000] [PSNR 21.417116]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 11:01:10.414967] [Time 54784.334] [AELoss 0.593132] [DLoss 0.000000] [PSNR 21.431878]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 11:15:40.332427] [Time 55654.251] [AELoss 0.588851] [DLoss 0.000000] [PSNR 21.246289]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 11:30:07.555699] [Time 56521.475] [AELoss 0.590119] [DLoss 0.000000] [PSNR 21.305721]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 11:44:43.326830] [Time 57397.245] [AELoss 0.587923] [DLoss 0.000000] [PSNR 21.710349]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 11:59:20.823298] [Time 58274.743] [AELoss 0.580972] [DLoss 0.000000] [PSNR 21.424040]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 12:13:51.907915] [Time 59145.827] [AELoss 0.579989] [DLoss 0.000000] [PSNR 21.221350]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 12:28:10.879185] [Time 60004.798] [AELoss 0.580838] [DLoss 0.000000] [PSNR 21.606280]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 12:42:32.815414] [Time 60866.734] [AELoss 0.571888] [DLoss 0.000000] [PSNR 21.856901]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 12:57:19.626597] [Time 61753.545] [AELoss 0.573640] [DLoss 0.000000] [PSNR 21.723761]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 13:12:08.969714] [Time 62642.888] [AELoss 0.572405] [DLoss 0.000000] [PSNR 21.697715]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 13:26:48.349191] [Time 63522.269] [AELoss 0.565681] [DLoss 0.000000] [PSNR 21.628144]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 13:41:38.385653] [Time 64412.305] [AELoss 0.567136] [DLoss 0.000000] [PSNR 21.347271]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 13:56:49.188781] [Time 65323.108] [AELoss 0.573657] [DLoss 0.000000] [PSNR 21.589191]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 14:11:44.821860] [Time 66218.741] [AELoss 0.566472] [DLoss 0.000000] [PSNR 21.795270]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 14:26:13.125863] [Time 67087.045] [AELoss 0.561722] [DLoss 0.000000] [PSNR 21.521759]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 14:40:45.720356] [Time 67959.639] [AELoss 0.564511] [DLoss 0.000000] [PSNR 21.476972]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 14:55:11.444923] [Time 68825.364] [AELoss 0.564315] [DLoss 0.000000] [PSNR 21.781254]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 15:09:35.556407] [Time 69689.475] [AELoss 0.555701] [DLoss 0.000000] [PSNR 21.922532]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 15:23:56.648582] [Time 70550.567] [AELoss 0.559186] [DLoss 0.000000] [PSNR 21.751087]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 15:38:12.640140] [Time 71406.559] [AELoss 0.555387] [DLoss 0.000000] [PSNR 21.822286]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 15:52:29.675862] [Time 72263.595] [AELoss 0.549472] [DLoss 0.000000] [PSNR 21.795162]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 16:06:38.720650] [Time 73112.640] [AELoss 0.557802] [DLoss 0.000000] [PSNR 21.780202]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 16:21:02.673397] [Time 73976.593] [AELoss 0.555007] [DLoss 0.000000] [PSNR 21.854189]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 16:35:29.080544] [Time 74843.000] [AELoss 0.550751] [DLoss 0.000000] [PSNR 21.731561]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 16:50:03.564083] [Time 75717.483] [AELoss 0.548782] [DLoss 0.000000] [PSNR 22.043005]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 17:04:49.601357] [Time 76603.520] [AELoss 0.549187] [DLoss 0.000000] [PSNR 21.948193]
+Saving Video with 16 frames, img shape 256, 256
+Saving Video with 16 frames, img shape 256, 256
+[2023-03-23 17:19:59.908084] [Time 77513.827] [AELoss 0.540627] [DLoss 0.000000] [PSNR 21.804616]
+slurmstepd: error: *** JOB 9326302 ON gpu2104 CANCELLED AT 2023-03-23T17:19:59 ***

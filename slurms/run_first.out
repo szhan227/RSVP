@@ -1,0 +1,31 @@
+## SLURM PROLOG ###############################################################
+##    Job ID : 9326147
+##  Job Name : run_first.sh
+##  Nodelist : gpu1503
+##      CPUs : 2
+##  Mem/Node : 16384 MB
+## Directory : /gpfs/data/jtompki1/yliang51/PVDM/slurms
+##   Job Started : Thu Mar 23 08:54:02 EDT 2023
+###############################################################################
+module: unloading 'python/3.7.4'
+module: loading 'python/3.8.12_gcc8.3'
+module: python: "To use: module load gcc/8.3"
+module: unloading 'gcc/8.3'
+module: loading 'gcc/8.3'
+module: gcc: "Note: loading the gcc module overrides the gcc version on the system.  If you want to revert to the version of gcc provided by the OS, unload the gcc module."
+module: loading 'cuda/11.1.1'
+module: cuda: To use: module load gcc/10.2
+module: loading 'cudnn/8.2.0'
+module: cudnn: To use: module load cuda/11.1.1 gcc/10.2
+module: loading 'anaconda/3-5.2.0'
+module: anaconda: "See https://docs.ccv.brown.edu/oscar/software/anaconda for potential issues on VNC and batch jobs"
+Traceback (most recent call last):
+  File "main.py", line 92, in <module>
+    main()
+  File "main.py", line 84, in main
+    first_stage(rank=0, args=args)
+  File "/gpfs/data/jtompki1/yliang51/PVDM/exps/first_stage.py", line 66, in first_stage
+    logger = Logger(fn)
+  File "/gpfs/data/jtompki1/yliang51/PVDM/utils.py", line 26, in __init__
+    assert False, "%s exists!" % logdir
+AssertionError: ./results/first_stage_main_UCF101_42/ exists!

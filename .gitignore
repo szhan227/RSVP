@@ -1,0 +1,8 @@
+sftp-config.json
+.DS_Store
+*.pyc
+results/
+May1st_results/
+May2nd_results/
+May3rd_results/
+
