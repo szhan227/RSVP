@@ -289,7 +289,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--epochs',     type=int, default=1)
     parser.add_argument('--batch_size', type=int, default=2)
-    parser.add_argument('--save_n',     type=int, default=10)
+    parser.add_argument('--save_n',     type=int, default=1)
     parser.add_argument('--msg_level',  type=str, default='info')
     parser.add_argument('--device',     type=str, default='cuda')
     parser.add_argument('--local_test', type=bool, default=False)
