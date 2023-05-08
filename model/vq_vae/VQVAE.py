@@ -367,6 +367,10 @@ class VQVAEModel(nn.Module):
         # quantize_id = rearrange(quantize_id, "(b t) c h w -> b t (c h w)", b=B)
         # quantize_mo = rearrange(quantize_mo, "(b t) c h w -> b t (c h w)", b=B)
 
+        logger.debug('in my_encoder, repeat bg and id on time dimension')
+        t = quantize_mo.shape[1]
+        quantize_bg = quantize_bg.repeat(1, t, 1, 1, 1)
+        quantize_id = quantize_id.repeat(1, t, 1, 1, 1)
         logger.debug('quantize_bg.shape: ', quantize_bg.shape)
         logger.debug('quantize_id.shape: ', quantize_id.shape)
         logger.debug('quantize_mo.shape: ', quantize_mo.shape)
@@ -445,9 +449,28 @@ class VQVAEModel(nn.Module):
 
     def get_quantized_by_tokens_with_rearrange(self, bg_tokens, id_tokens, mo_tokens):
         quantized_bg, quantized_id, quantized_mo = self.get_quantized_by_tokens(bg_tokens, id_tokens, mo_tokens)
-        quantized_bg = rearrange(quantized_bg, 'b t c h w -> b c (t h w)')
-        quantized_id = rearrange(quantized_id, 'b t c h w -> b c (t h w)')
-        quantized_mo = rearrange(quantized_mo, 'b t c h w -> b c (t h w)')
+        logger.debug('rearrange: b t c h w -> b c t h w')
+        quantized_bg = rearrange(quantized_bg, 'b t c h w -> b c t h w')
+        quantized_id = rearrange(quantized_id, 'b t c h w -> b c t h w')
+        quantized_mo = rearrange(quantized_mo, 'b t c h w -> b c t h w')
+
+        logger.debug('quantized_bg.shape: ', quantized_bg.shape)
+        logger.debug('quantized_id.shape: ', quantized_id.shape)
+        logger.debug('quantized_mo.shape: ', quantized_mo.shape)
+        # logger.debug('here reshape: b t c h w -> b c (t h w)')
+        # quantized_bg = rearrange(quantized_bg, 'b t c h w -> b c (t h w)')
+        # quantized_id = rearrange(quantized_id, 'b t c h w -> b c (t h w)')
+        # quantized_mo = rearrange(quantized_mo, 'b t c h w -> b c (t h w)')
+        return quantized_bg, quantized_id, quantized_mo
+
+
+    def rearrange_quantized(self, quantized_bg, quantized_id, quantized_mo):
+        logger.debug('rearrange: b c t h w -> b t c h w')
+        quantized_bg = torch.unsqueeze(quantized_bg, dim=1)
+        quantized_id = torch.unsqueeze(quantized_id, dim=1)
+        quantized_bg = rearrange(quantized_bg, 'b c t h w -> b t c h w')
+        quantized_id = rearrange(quantized_id, 'b c t h w -> b t c h w')
+        quantized_mo = rearrange(quantized_mo, 'b c t h w -> b t c h w')
         return quantized_bg, quantized_id, quantized_mo
 
     def convert_latent_to_quantized(self, z, ds_b, ds_i, ds_m, hidden_sz, num_frames):

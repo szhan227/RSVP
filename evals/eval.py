@@ -274,6 +274,7 @@ def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None, num_loop=1):
                            channels=ema_model.diffusion_model.in_channels,
                            image_size=ema_model.diffusion_model.image_size,
                            sampling_timesteps=100,
+                           # parameterization='x0',
                            w=0.).to(device)
     real_embeddings = []
     fake_embeddings = []
@@ -316,22 +317,15 @@ def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None, num_loop=1):
             B = xmo_tokens.shape[0]
             T = xmo_tokens.shape[1]
 
-            xbg_quantized, xid_quantized, xmo_quantized = vqvae.get_quantized_by_tokens(
+            xbg_quantized, xid_quantized, xmo_quantized = vqvae.get_quantized_by_tokens_with_rearrange(
                                                                                                  xbg_tokens,
                                                                                                  xid_tokens,
                                                                                                  xmo_tokens)
 
-            cbg_quantized, cid_quantized, cmo_quantized = vqvae.get_quantized_by_tokens(
+            cbg_quantized, cid_quantized, cmo_quantized = vqvae.get_quantized_by_tokens_with_rearrange(
                                                                                                     cbg_tokens,
                                                                                                     cid_tokens,
                                                                                                     cmo_tokens)
-
-            xbg_quantized = rearrange(xbg_quantized, 'b t c h w -> b c (t h w)')
-            xid_quantized = rearrange(xid_quantized, 'b t c h w -> b c (t h w)')
-            xmo_quantized = rearrange(xmo_quantized, 'b t c h w -> b c (t h w)')
-            cbg_quantized = rearrange(cbg_quantized, 'b t c h w -> b c (t h w)')
-            cid_quantized = rearrange(cid_quantized, 'b t c h w -> b c (t h w)')
-            cmo_quantized = rearrange(cmo_quantized, 'b t c h w -> b c (t h w)')
 
             xbgs.append(xbg_quantized)
             xids.append(xid_quantized)
@@ -343,23 +337,31 @@ def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None, num_loop=1):
         concat_dim = -1
         for i in range(min(num_loop, len(cbgs))):
 
-            ds_bg = diffusion_model.model.diffusion_model.ds_bg
-            ds_id = diffusion_model.model.diffusion_model.ds_id
-            ds_mo = diffusion_model.model.diffusion_model.ds_mo
-            hidden_size = diffusion_model.model.diffusion_model.vae_hidden
-            n_frames = T
+            # ds_bg = diffusion_model.model.diffusion_model.ds_bg
+            # ds_id = diffusion_model.model.diffusion_model.ds_id
+            # ds_mo = diffusion_model.model.diffusion_model.ds_mo
+            # hidden_size = diffusion_model.model.diffusion_model.vae_hidden
+            # n_frames = T
 
-            c = torch.cat([cbgs[i], cids[i], cmos[i]], dim=concat_dim)
-            x = torch.cat([xbgs[i], xids[i], xmos[i]], dim=concat_dim)
-            z = diffusion_model.sample(batch_size=B, cond=c)
+            cbg, cid, cmo = cbgs[i], cids[i], cmos[i]
+            xbg, xid, xmo = xbgs[i], xids[i], xmos[i]
+            z = diffusion_model.sample_moso(batch_size=B, cond=(cbg, cid, cmo))
 
-            logger.debug('here show the shape of sampleing z:', z.shape)
+            # logger.info('here show the shape of sampleing z:', z.shape)
             # x_rec, _, _ = vqvae._decoder(bgs[i], ids[i], gts[i].permute(0, 2, 1, 3, 4))
             # x_rec_fake, _, _ = vqvae._decoder(bgs[i], ids[i], z.permute(0, 2, 1, 3, 4))
-            pred_bg_quantized, pred_id_quantized, pred_mo_quantized = vqvae.convert_latent_to_quantized(
-                z, ds_bg, ds_id, ds_mo, hidden_size, n_frames)
-            true_bg_quantized, true_id_quantized, true_mo_quantized = vqvae.convert_latent_to_quantized(
-                x, ds_bg, ds_id, ds_mo, hidden_size, n_frames)
+
+            cbg = rearrange(cbg, 'b c t h w -> b t c h w')
+            cid = rearrange(cid, 'b c t h w -> b t c h w')
+            # cmo = rearrange(cmo, 'b c t h w -> b t c h w')
+            xbg = rearrange(xbg, 'b c t h w -> b t c h w')
+            xid = rearrange(xid, 'b c t h w -> b t c h w')
+            xmo = rearrange(xmo, 'b c t h w -> b t c h w')
+            z = rearrange(z, 'b c t h w -> b t c h w')
+
+            pred_bg_quantized, pred_id_quantized, pred_mo_quantized = cbg, cid, z
+
+            true_bg_quantized, true_id_quantized, true_mo_quantized = xbg, xid, xmo
 
             pred_rec, _, _ = vqvae._decoder(pred_bg_quantized, pred_id_quantized, pred_mo_quantized)
             real_rec, _, _ = vqvae._decoder(true_bg_quantized, true_id_quantized, true_mo_quantized)

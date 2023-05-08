@@ -117,6 +117,7 @@ def train(frozen_vqvae,
                      linear_start=linear_start,
                      linear_end=linear_end,
                      log_every_t=log_every_t,
+                     # parameterization='x0',
                      w=w,
                      ).to(device)
 
@@ -156,19 +157,23 @@ def train(frozen_vqvae,
 
     # start train loop
     for epoch in range(num_epochs):
-
+        # if args.local_test and epoch > 0:
+        #     break
         total_length = len(train_loader)
 
         for it, inputs in enumerate(train_loader):
-
+            if local_test and it > 0:
+                break
             diffusion_wrapper.zero_grad()
-            # if it > 0:
-            #     break
             if unet.cond_model:
 
                 c_toks, x_toks = inputs
                 cbg_toks, cid_toks, cmo_toks = c_toks
                 xbg_toks, xid_toks, xmo_toks = x_toks
+
+                logger.debug('xbg_toks', xbg_toks.shape)
+                logger.debug('xid_toks', xid_toks.shape)
+                logger.debug('xmo_toks', xmo_toks.shape)
 
                 B, T, _, _ = cmo_toks.shape
 
@@ -178,10 +183,18 @@ def train(frozen_vqvae,
                     xbg_quantized, xid_quantized, xmo_quantized = frozen_vqvae.get_quantized_by_tokens_with_rearrange(
                         xbg_toks, xid_toks, xmo_toks)
 
-                zc = torch.cat([cbg_quantized, cid_quantized, cmo_quantized], dim=-1)
-                zx = torch.cat([xbg_quantized, xid_quantized, xmo_quantized], dim=-1)
+                logger.debug('right before calling denoising module')
+                logger.debug('bg_quantized', xbg_quantized.shape)
+                logger.debug('id_quantized', xid_quantized.shape)
+                logger.debug('mo_quantized', xmo_quantized.shape)
 
-                (loss, t, output), loss_dict = ddpm_criterion(zx.float(), zc.float())
+                # zc = torch.cat([cbg_quantized, cid_quantized, cmo_quantized], dim=-1)
+                # zx = torch.cat([xbg_quantized, xid_quantized, xmo_quantized], dim=-1)
+                zc = cbg_quantized.float(), cid_quantized.float(), cmo_quantized.float()
+                zx = xbg_quantized.float(), xid_quantized.float(), xmo_quantized.float()
+
+                # (loss, t, output), loss_dict = ddpm_criterion(zx.float(), zc.float())
+                (loss, t, output), loss_dict = ddpm_criterion(zx, zc)
 
             else:
                 bg_tokens, id_tokens, mo_tokens = inputs
@@ -284,6 +297,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     # # change message level of the logger.
     logger.set_level(args.msg_level)
+    if args.local_test:
+        logger.set_level('debug')
 
     # TODO: load your pretrained vqvae model here. Unet = None means to train DDPM from scratch.
     frozen_vqvae = None

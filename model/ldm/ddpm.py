@@ -259,6 +259,29 @@ class DDPM(nn.Module):
         nonzero_mask = (1 - (t == 0).float()).reshape(b, *((1,) * (len(x.shape) - 1)))
         return model_mean + nonzero_mask * (0.5 * model_log_variance).exp() * noise
 
+    def p_mean_variance_moso(self, x, cond, t, context=None, clip_denoised: bool=True):
+        cbg, cid, cmo = cond
+        z = cbg, cid, x
+        bg_out, id_out, mo_out = self.model(z, cond, t, context)
+        if self.parameterization == "eps":
+            x_recon = self.predict_start_from_noise(x, t=t, noise=mo_out)
+        elif self.parameterization == "x0":
+            x_recon = mo_out
+        if clip_denoised:
+            x_recon.clamp_(-1., 1.)
+
+        model_mean, posterior_variance, posterior_log_variance = self.q_posterior(x_start=x_recon, x_t=x, t=t)
+        return model_mean, posterior_variance, posterior_log_variance
+
+    @torch.no_grad()
+    def p_sample_moso(self, x, cond, t, context=None, clip_denoised=True, repeat_noise=False):
+        b, *_, device = *x.shape, x.device
+        model_mean, _, model_log_variance = self.p_mean_variance_moso(x=x, cond=cond, t=t, clip_denoised=clip_denoised)
+        noise = noise_like(x.shape, device, repeat_noise)
+        # no noise when t == 0
+        nonzero_mask = (1 - (t == 0).float()).reshape(b, *((1,) * (len(x.shape) - 1)))
+        return model_mean + nonzero_mask * (0.5 * model_log_variance).exp() * noise
+
     @torch.no_grad()
     def p_sample_loop(self, shape, cond=None, return_intermediates=False):
         device = self.betas.device
@@ -340,10 +363,30 @@ class DDPM(nn.Module):
 
         ''' ddim sampling '''
         if self.is_ddim_sampling:
+            logger.info('start ddim sampling')
             return self.ddim_sample((batch_size, channels, image_size), cond)
         else:
+            logger.info('start ddpm sampling')
             return self.p_sample_loop((batch_size, channels, image_size), cond,
                                   return_intermediates=return_intermediates)
+
+    def sample_moso(self, batch_size=16, cond=None, return_intermediates=False):
+        device = self.betas.device
+        cbg, cid, cmo = cond
+        b = cbg.shape[0]
+        # bg_noise = torch.randn(cbg.shape, device=device)
+        # id_noise = torch.randn(cid.shape, device=device)
+        mo_noise = torch.randn(cmo.shape, device=device)
+        img = mo_noise
+        intermediates = [img]
+        for i in tqdm(reversed(range(0, self.num_timesteps)), desc = 'sampling loop time step'):
+            img = self.p_sample_moso(img, cond, torch.full((b,), i, device=device, dtype=torch.long),
+                                clip_denoised=self.clip_denoised)
+            if i % self.log_every_t == 0 or i == self.num_timesteps - 1:
+                intermediates.append(img)
+        if return_intermediates:
+            return img, intermediates
+        return img
 
     def q_sample(self, x_start, t, noise=None):
         noise = default(noise, lambda: torch.randn_like(x_start))
@@ -395,11 +438,67 @@ class DDPM(nn.Module):
 
         return loss, loss_dict, model_out
 
+    def p_losses_moso(self, x_start, cond, t, noise=None):
+        logger.debug('show t in p_losses_moso:', t, t.shape)
+
+        xbg, xid, xmo = x_start
+
+        noise = default(noise, lambda: torch.randn_like(xmo))
+
+        # bg_noise = default(noise, lambda: torch.randn_like(xbg))
+        # id_noise = default(noise, lambda: torch.randn_like(xid))
+        # mo_noise = default(noise, lambda: torch.randn_like(xmo))
+
+        # a reparameterization of forward add noise steps to step t
+
+        # x_noisy_bg = self.q_sample(x_start=xbg, t=t, noise=noise)
+        # x_noisy_id = self.q_sample(x_start=xid, t=t, noise=noise)
+        x_noisy_mo = self.q_sample(x_start=xmo, t=t, noise=noise)
+
+        # x_noisy = x_noisy_bg, x_noisy_id, x_noisy_mo
+        x_noisy = xbg, xid, x_noisy_mo
+        out_bg, out_id, out_mo = self.model(x_noisy, cond, t)
+        # logger.debug('show model_out in p_losses_moso', model_out.shape)
+        loss_dict = {}
+        if self.parameterization == "eps":
+            target = noise
+            # target_bg = bg_noise
+            # target_id = id_noise
+            # target_mo = mo_noise
+        elif self.parameterization == "x0":
+            target = x_start
+        else:
+            raise NotImplementedError(f"Paramterization {self.parameterization} not yet supported")
+
+        logger.debug('here show out_noisy_mo shape', out_mo.shape)
+        logger.debug('here show target shape', target.shape)
+
+        # loss_bg = self.get_loss(out_bg, target_bg, mean=False).mean(dim=[1, 2, 3, 4])
+        # loss_id = self.get_loss(out_id, target_id, mean=False).mean(dim=[1, 2, 3, 4])
+        # loss_mo = self.get_loss(out_mo, target_mo, mean=False).mean(dim=[1, 2, 3, 4])
+        # ratios = out_bg.shape
+        # loss = loss_bg + loss_id + loss_mo
+        loss = self.get_loss(out_mo, target, mean=False).mean(dim=[1, 2, 3, 4])
+
+        log_prefix = 'train' if self.training else 'val'
+
+        loss_dict.update({f'{log_prefix}/loss_simple': loss.mean()})
+        loss_simple = loss.mean() * self.l_simple_weight
+        loss_vlb = (self.lvlb_weights[t] * loss).mean()
+        loss_dict.update({f'{log_prefix}/loss_vlb': loss_vlb})
+
+        loss = loss_simple + self.original_elbo_weight * loss_vlb
+
+        loss_dict.update({f'{log_prefix}/loss': loss})
+
+        return loss, loss_dict, out_mo
+
     def forward(self, x, cond=None, *args, **kwargs):
         # b, c, h, w, device, img_size, = *x.shape, x.device, self.image_size
         # assert h == img_size and w == img_size, f'height and width of image must be {img_size}'
-        t = torch.randint(0, self.num_timesteps, (x.shape[0],), device=x.device).long()
-        return self.p_losses(x, cond, t, *args, **kwargs), t
+        # x now is a tuple of bg, id, mo
+        t = torch.randint(0, self.num_timesteps, (x[0].shape[0],), device=x[0].device).long()
+        return self.p_losses_moso(x, cond, t, *args, **kwargs), t
 
     def get_input(self, batch, k):
         x = batch[k]

@@ -34,6 +34,7 @@ class DiffusionWrapper(nn.Module):
 
     def forward(self, x, cond, t, c_concat: list = None, c_crossattn: list = None):
         if self.conditioning_key is None:
+            logger.debug('Conditioning Key is None')
             out = self.diffusion_model(x, cond, t)
         elif self.conditioning_key == 'concat':
             xc = torch.cat([x] + c_concat, dim=1)
@@ -521,7 +522,7 @@ class UNetModel(nn.Module):
         dropout=0,
         channel_mult=(1, 2, 4, 8),
         conv_resample=True,
-        dims=2,
+        dims=3,
         num_classes=None,
         use_checkpoint=False,
         use_fp16=False,
@@ -911,34 +912,44 @@ class UNetModel(nn.Module):
             assert y.shape == (x.shape[0],)
             emb = emb + self.label_emb(y)
 
-        h = x.type(self.dtype)
+        # h = x.type(self.dtype)
+        xbg, xid, x_mo_noisy = x
+        h_bg = xbg.type(self.dtype)  # shape: (batch_size, 256, 1, 32, 32)
+        h_id = xid.type(self.dtype)  # shape: (batch_size, 256, 1, 16, 16)
+        h_mo = x_mo_noisy.type(self.dtype) # shape: (batch_size, 256, 16, 8, 8)
+
+        cbg, cid, cmo = cond
+
         if cond != None:
-            logger.debug('show h shape: ', h.shape)
-            logger.debug('show cond shape: ', cond.shape)
-            h = torch.cat([h, cond], dim=1)
-            logger.debug('here concat z and h together in time dimension')
+
+            # h = torch.cat([h, cond], dim=1)
+            channel_dim = 1
+            h_bg = torch.cat([h_bg, cbg.type(self.dtype)], dim=channel_dim)
+            h_id = torch.cat([h_id, cid.type(self.dtype)], dim=channel_dim)
+            h_mo = torch.cat([h_mo, cmo.type(self.dtype)], dim=channel_dim)
+            logger.debug('here concat z and h together in channel dimension')
         elif self.cond_model:
+            pass
+            # h = torch.cat([h, self.zeros.repeat(h.size(0), 1, 1)], dim=1)
 
-            h = torch.cat([h, self.zeros.repeat(h.size(0), 1, 1)], dim=1)
-
-        logger.debug('h shape: ', h.shape)
+        # logger.debug('h shape: ', h.shape)
         # logger.debug('zeros shape: ', self.zeros.repeat(h.size(0), 1, 1).shape)
         # TODO: treat 32 and 16 as variables
 
         # h_bg = h[:, :, 0:32*32].view(h.size(0), h.size(1), 32, 32)
         # h_id = h[:, :, 32*32:32*(32+16)].view(h.size(0), h.size(1), 16, 32)
         # h_mo = h[:, :, 32*(32+16):32*(32+16+16)].view(h.size(0), h.size(1), 16, 32)
-        bg_len = self.vae_hidden // 2 ** self.ds_bg  # 256 // 8 = 32
-        id_len = self.vae_hidden // 2 ** self.ds_id  # 256 // 16 = 16
-        mo_len = int(math.sqrt(h.size(-1) - bg_len ** 2 - id_len ** 2))  # 32
+        # bg_len = self.vae_hidden // 2 ** self.ds_bg  # 256 // 8 = 32
+        # id_len = self.vae_hidden // 2 ** self.ds_id  # 256 // 16 = 16
+        # mo_len = int(math.sqrt(h.size(-1) - bg_len ** 2 - id_len ** 2))  # 32
         # h_bg = h[:, :, :32 * 32].view(h.size(0), h.size(1), 32, 32)
         # h_id = h[:, :, 32 * 32: 32 * 32 + 16 * 16].view(h.size(0), h.size(1), 16, 16)
         # h_mo = h[:, :, 32 * 32 + 16 * 16:32 * 32 + 16 * 16 + 32 * 32].view(h.size(0), h.size(1), 32, 32)
 
-        h_bg, h_id, h_mo = h.split([bg_len ** 2, id_len ** 2, mo_len ** 2], dim=2)
-        h_bg = h_bg.view(h.size(0), h.size(1), bg_len, bg_len)
-        h_id = h_id.view(h.size(0), h.size(1), id_len, id_len)
-        h_mo = h_mo.view(h.size(0), h.size(1), mo_len, mo_len)
+        # h_bg, h_id, h_mo = h.split([bg_len ** 2, id_len ** 2, mo_len ** 2], dim=2)
+        # h_bg = h_bg.view(h.size(0), h.size(1), bg_len, bg_len)
+        # h_id = h_id.view(h.size(0), h.size(1), id_len, id_len)
+        # h_mo = h_mo.view(h.size(0), h.size(1), mo_len, mo_len)
         # h_bg, h_id, h_mo = torch.chunk(h, 3, dim=-1)
 
         # trial: reconstruct hc and hx based on only 1 frame for bg and id
@@ -960,10 +971,10 @@ class UNetModel(nn.Module):
         logger.debug('h_mo shape: ', h_mo.shape)
         # logger.debug('input_blocks: ', len(self.input_blocks))
         # logger.debug('input_attns : ', len(self.input_attns))
-        # logger.debug('start unet down sampling')
+        logger.debug('start unet down sampling')
         counter = 0
         for module, input_attn in zip(self.input_blocks, self.input_attns):
-            # logger.debug('\tinput_attn: ', input_attn)
+            logger.debug('\tstart loop: ', counter)
             h_bg = module(h_bg, emb, context)
             h_id = module(h_id, emb, context)
             h_mo = module(h_mo, emb, context)
@@ -973,29 +984,54 @@ class UNetModel(nn.Module):
             logger.debug('\th_mo shape after module: ', h_mo.shape)
 
             # TODO: try to change res and t
-            res = h_bg.size(-2)
-            t   = h_id.size(-2)
-            logger.debug('\tres, t: ', res, t)
+            # res = h_bg.size(-2)
+            # t   = h_id.size(-2)
+            # logger.debug('\tres, t: ', res, t)
+            #
+            # h_bg = h_bg.view(h_bg.size(0), h_bg.size(1), -1)
+            # h_id = h_id.view(h_id.size(0), h_id.size(1), -1)
+            # h_mo = h_mo.view(h_mo.size(0), h_mo.size(1), -1)
 
-            h_bg = h_bg.view(h_bg.size(0), h_bg.size(1), -1)
-            h_id = h_id.view(h_id.size(0), h_id.size(1), -1)
-            h_mo = h_mo.view(h_mo.size(0), h_mo.size(1), -1)
-
+            '''
+                In order to calculate attention, first reshape and concat, then reshape back
+            '''
             logger.debug('\th_bg shape after view: ', h_bg.shape)
             logger.debug('\th_id shape after view: ', h_id.shape)
             logger.debug('\th_mo shape after view: ', h_mo.shape)
 
+            t_static = h_bg.size(2)
+            t_mo = h_mo.size(2)
+            bg_sz = h_bg.size(3)
+            id_sz = h_id.size(3)
+            mo_sz = h_mo.size(3)
+            batch_sz = h_bg.size(0)
+            model_channels = h_bg.size(1)
+
+            h_bg = h_bg.reshape(batch_sz, model_channels, -1)
+            h_id = h_id.reshape(batch_sz, model_channels, -1)
+            h_mo = h_mo.reshape(batch_sz, model_channels, -1)
+
+
             # concatenate the three parts in last dimension
             h = torch.cat([h_bg, h_id, h_mo], dim=-1)
             h = input_attn(h)
-            input_channels = 4
             logger.debug('\th shape after input_attn: ', h.shape)
+
+            h_bg, h_id, h_mo = torch.split(h, [t_static * bg_sz * bg_sz,
+                                               t_static * id_sz * id_sz,
+                                               t_mo * mo_sz * mo_sz],
+                                               dim=2)
+
+            h_bg = h_bg.reshape(batch_sz, model_channels, t_static, bg_sz, bg_sz)
+            h_id = h_id.reshape(batch_sz, model_channels, t_static, id_sz, id_sz)
+            h_mo = h_mo.reshape(batch_sz, model_channels, t_mo, mo_sz, mo_sz)
+
             # h = h.reshape(h.size(0), h.size(1), input_channels, -1)
             # res = 32
             # t = 16
-            h_bg = h[:, :, :res*res].view(h.size(0), h.size(1), res, res)
-            h_id = h[:, :, res*res:res*res + t*t].view(h.size(0), h.size(1), t, t)
-            h_mo = h[:, :, res*res+t*t:res*res+t*t + res * res].view(h.size(0), h.size(1), res, res)
+            # h_bg = h[:, :, :res*res].view(h.size(0), h.size(1), res, res)
+            # h_id = h[:, :, res*res:res*res + t*t].view(h.size(0), h.size(1), t, t)
+            # h_mo = h[:, :, res*res+t*t:res*res+t*t + res * res].view(h.size(0), h.size(1), res, res)
             # h_bg, h_id, h_mo = torch.chunk(h, 3, dim=-1)
 
             logger.debug('\th_bg shape after res*res: ', h_bg.shape)
@@ -1006,35 +1042,60 @@ class UNetModel(nn.Module):
             h_ids.append(h_id)
             h_mos.append(h_mo)
 
-            logger.debug('\tin loop:', counter)
+            logger.debug('\tend loop:', counter)
             logger.debug('\tappend h_bg shape: ', h_bg.shape)
             logger.debug('\tappend h_id shape: ', h_id.shape)
             logger.debug('\tappend h_mo shape: ', h_mo.shape)
             logger.debug()
             counter += 1
 
+        logger.debug('end unet down sampling')
+
         h_bg = self.middle_block(h_bg, emb, context)
         h_id = self.middle_block(h_id, emb, context)
         h_mo = self.middle_block(h_mo, emb, context)
 
-        res = h_bg.size(-2)
-        t   = h_id.size(-2)
+        # res = h_bg.size(-2)
+        # t   = h_id.size(-2)
+        #
+        # h_bg = h_bg.view(h_bg.size(0), h_bg.size(1), -1)
+        # h_id = h_id.view(h_id.size(0), h_id.size(1), -1)
+        # h_mo = h_mo.view(h_mo.size(0), h_mo.size(1), -1)
 
-        h_bg = h_bg.view(h_bg.size(0), h_bg.size(1), -1)
-        h_id = h_id.view(h_id.size(0), h_id.size(1), -1)
-        h_mo = h_mo.view(h_mo.size(0), h_mo.size(1), -1)
+        t_static = h_bg.size(2)
+        t_mo = h_mo.size(2)
+        bg_sz = h_bg.size(3)
+        id_sz = h_id.size(3)
+        mo_sz = h_mo.size(3)
+        batch_sz = h_bg.size(0)
+        model_channels = h_bg.size(1)
+
+        h_bg = h_bg.reshape(batch_sz, model_channels, -1)
+        h_id = h_id.reshape(batch_sz, model_channels, -1)
+        h_mo = h_mo.reshape(batch_sz, model_channels, -1)
 
         h = torch.cat([h_bg, h_id, h_mo], dim=-1)
         h = self.mid_attn(h)
+
+        h_bg, h_id, h_mo = torch.split(h, [t_static * bg_sz * bg_sz,
+                                           t_static * id_sz * id_sz,
+                                           t_mo * mo_sz * mo_sz],
+                                       dim=2)
+
+        h_bg = h_bg.reshape(batch_sz, model_channels, t_static, bg_sz, bg_sz)
+        h_id = h_id.reshape(batch_sz, model_channels, t_static, id_sz, id_sz)
+        h_mo = h_mo.reshape(batch_sz, model_channels, t_mo, mo_sz, mo_sz)
+
+
 
         # h_bg = h[:, :, :res * res].view(h.size(0), h.size(1), res, res)
         # h_id = h[:, :, res * res:res * res + t * t].view(h.size(0), h.size(1), t, t)
         # h_mo = h[:, :, res * res + t * t:res * res + t * t + res * res].view(h.size(0), h.size(1), res, res)
 
-        h_bg, h_id, h_mo = h.split([res ** 2, t ** 2, res ** 2], dim=2)
-        h_bg = h_bg.view(h.size(0), h.size(1), res, res)
-        h_id = h_id.view(h.size(0), h.size(1), t, t)
-        h_mo = h_mo.view(h.size(0), h.size(1), res, res)
+        # h_bg, h_id, h_mo = h.split([res ** 2, t ** 2, res ** 2], dim=2)
+        # h_bg = h_bg.view(h.size(0), h.size(1), res, res)
+        # h_id = h_id.view(h.size(0), h.size(1), t, t)
+        # h_mo = h_mo.view(h.size(0), h.size(1), res, res)
 
         logger.debug('start up sampling')
         for module, output_attn in zip(self.output_blocks, self.output_attns):
@@ -1050,20 +1111,41 @@ class UNetModel(nn.Module):
             res = h_bg.size(-2)
             t   = h_id.size(-2)
 
-            h_bg = h_bg.view(h_bg.size(0), h_bg.size(1), -1)
-            h_id = h_id.view(h_id.size(0), h_id.size(1), -1)
-            h_mo = h_mo.view(h_mo.size(0), h_mo.size(1), -1)
+            t_static = h_bg.size(2)
+            t_mo = h_mo.size(2)
+            bg_sz = h_bg.size(3)
+            id_sz = h_id.size(3)
+            mo_sz = h_mo.size(3)
+            batch_sz = h_bg.size(0)
+            model_channels = h_bg.size(1)
+
+            h_bg = h_bg.reshape(batch_sz, model_channels, -1)
+            h_id = h_id.reshape(batch_sz, model_channels, -1)
+            h_mo = h_mo.reshape(batch_sz, model_channels, -1)
+
+            # h_bg = h_bg.view(h_bg.size(0), h_bg.size(1), -1)
+            # h_id = h_id.view(h_id.size(0), h_id.size(1), -1)
+            # h_mo = h_mo.view(h_mo.size(0), h_mo.size(1), -1)
 
             h = torch.cat([h_bg, h_id, h_mo], dim=-1)
             h = output_attn(h)
 
+            h_bg, h_id, h_mo = torch.split(h, [t_static * bg_sz * bg_sz,
+                                               t_static * id_sz * id_sz,
+                                               t_mo * mo_sz * mo_sz],
+                                           dim=2)
+
+            h_bg = h_bg.reshape(batch_sz, model_channels, t_static, bg_sz, bg_sz)
+            h_id = h_id.reshape(batch_sz, model_channels, t_static, id_sz, id_sz)
+            h_mo = h_mo.reshape(batch_sz, model_channels, t_mo, mo_sz, mo_sz)
+
             # h_bg = h[:, :, :res*res].view(h.size(0), h.size(1), res, res)
             # h_id = h[:, :, res*res:res*res + t*t].view(h.size(0), h.size(1), t, t)
             # h_mo = h[:, :, res*res+t*t:res*res+t*t + res * res].view(h.size(0), h.size(1), res, res)
-            h_bg, h_id, h_mo = h.split([res ** 2, t ** 2, res ** 2], dim=2)
-            h_bg = h_bg.view(h.size(0), h.size(1), res, res)
-            h_id = h_id.view(h.size(0), h.size(1), t, t)
-            h_mo = h_mo.view(h.size(0), h.size(1), res, res)
+            # h_bg, h_id, h_mo = h.split([res ** 2, t ** 2, res ** 2], dim=2)
+            # h_bg = h_bg.view(h.size(0), h.size(1), res, res)
+            # h_id = h_id.view(h.size(0), h.size(1), t, t)
+            # h_mo = h_mo.view(h.size(0), h.size(1), res, res)
             # logger.debug('\tappend h_bg shape: ', h_bg.shape)
             # logger.debug('\tappend h_id shape: ', h_id.shape)
             # logger.debug('\tappend h_mo shape: ', h_mo.shape)
@@ -1072,21 +1154,23 @@ class UNetModel(nn.Module):
         h_bg = self.out(h_bg)
         h_id = self.out(h_id)
         h_mo = self.out(h_mo)
-        # logger.debug('out h_bg shape: ', h_bg.shape)
-        # logger.debug('out h_id shape: ', h_id.shape)
-        # logger.debug('out h_mo shape: ', h_mo.shape)
-        h_bg = h_bg.view(h_bg.size(0), h_bg.size(1), -1)
-        h_id = h_id.view(h_id.size(0), h_id.size(1), -1)
-        h_mo = h_mo.view(h_mo.size(0), h_mo.size(1), -1)
+        logger.debug('out h_bg shape: ', h_bg.shape)
+        logger.debug('out h_id shape: ', h_id.shape)
+        logger.debug('out h_mo shape: ', h_mo.shape)
+        # h_bg = h_bg.view(h_bg.size(0), h_bg.size(1), -1)
+        # h_id = h_id.view(h_id.size(0), h_id.size(1), -1)
+        # h_mo = h_mo.view(h_mo.size(0), h_mo.size(1), -1)
         # logger.debug('view out h_bg shape: ', h_bg.shape)
         # logger.debug('view out h_id shape: ', h_id.shape)
         # logger.debug('view out h_mo shape: ', h_mo.shape)
 
-        h = torch.cat([h_bg, h_id, h_mo], dim=-1)
-        logger.debug('cat out h shape: ', h.shape)
-        h = h.type(x.dtype)
+        # h = torch.cat([h_bg, h_id, h_mo], dim=-1)
+        # logger.debug('cat out h shape: ', h.shape)
+        # h = h.type(x.dtype)
 
-        return h
+        return h_bg, h_id, h_mo
+
+
 
 
 if __name__ == '__main__':

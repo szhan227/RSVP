@@ -9,7 +9,7 @@ import utils
 from model.vq_vae.VQVAE import VQVAEModel
 from model.ldm.unet import UNetModel, DiffusionWrapper
 from model.ema import LitEma
-from losses.ddpm import DDPM
+from model.ldm.ddpm import DDPM
 from omegaconf import OmegaConf
 from torch.cuda.amp import GradScaler, autocast
 import time
@@ -592,10 +592,40 @@ if __name__ == '__main__':
 
     # play_with_all_process()
     # import glob
-    preprocess()
+    # preprocess()
     # data_list = glob.glob('./data/*.npy')
     # for data_path in data_list:
     #     dt = np.load(data_path, allow_pickle=True).item()
     #     for key in dt:
     #         print(key+':', torch.from_numpy(dt[key]).shape)
     #     print('---------------------')
+    B = 3
+    L = 16
+    rate =0.7
+
+
+    total_mask_num =min(L - 1, max(1, int(L * rate)))
+
+    print(total_mask_num)
+
+    # mask_ids = torch.multinomial(torch.ones(B, L), total_mask_num, replacement=False)
+    # print(mask_ids)
+    # fake_ids = torch.Tensor(list(range(B))).view(B, 1).repeat(1, total_mask_num).long()
+    # fake_ids = (L * fake_ids + mask_ids).view(-1)
+    # print(fake_ids)
+    # mask = torch.zeros(B * L)
+    # # mask[fake_ids] = 1
+    # mask = mask.view(B, L).long()
+    #
+    # mask[:, :L // 2] = 1
+    # mask = mask.view(B, L, 1, 1).repeat(1, 1, 32, 32)
+    # print('show mask:')
+    # # embedding = torch.nn.Embedding(num_embeddings=2, embedding_dim=256)
+    # # mask = embedding(mask)
+    # print(mask)
+
+    total_timesteps = 1000
+    sampling_timesteps = 700
+    times = torch.linspace(-1, total_timesteps - 1, steps=sampling_timesteps + 1).int()
+    print(times)
+

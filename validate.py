@@ -79,6 +79,7 @@ def validate(input_batch, condition_batch=None, vqvae=None, diffusion_wrapper=No
                           linear_start=linear_start,
                           linear_end=linear_end,
                           log_every_t=log_every_t,
+                          # parameterization='x0',
                           w=w,
                           ).to(device)
 
@@ -160,23 +161,23 @@ def validate_fvd():
     logger.debug('show vqvae config:', moso_model_opt)
     frozen_vqvae = VQVAEModel(moso_model_opt, moso_opt).to(device)
     if moso_model_opt['checkpoint_path'] is not None:
-        state = torch.load(moso_model_opt['checkpoint_path'], map_location='cpu')
-        start_step = state['steps']
-
-        from collections import OrderedDict
-        new_state_dict = OrderedDict()
-        for k, v in state['state'].items():
-            if 'total_ops' in k or 'total_params' in k:
-                continue
-            if 'perceptual_loss' in k or '_discriminator' in k:
-                # if 'perceptual_loss' in k:
-                continue
-            if k[:7] == 'module.':
-                new_state_dict[k[7:]] = v
-
-        # model.load_state_dict(new_state_dict, strict=False)
-        frozen_vqvae.load_state_dict(new_state_dict, strict=moso_model_opt['load_strict'])
-        logger.info("Successfully load state {} with step {}.".format(moso_model_opt['checkpoint_path'], start_step))
+        # state = torch.load(moso_model_opt['checkpoint_path'], map_location='cpu')
+        # start_step = state['steps']
+        #
+        # from collections import OrderedDict
+        # new_state_dict = OrderedDict()
+        # for k, v in state['state'].items():
+        #     if 'total_ops' in k or 'total_params' in k:
+        #         continue
+        #     if 'perceptual_loss' in k or '_discriminator' in k:
+        #         # if 'perceptual_loss' in k:
+        #         continue
+        #     if k[:7] == 'module.':
+        #         new_state_dict[k[7:]] = v
+        #
+        # # model.load_state_dict(new_state_dict, strict=False)
+        # frozen_vqvae.load_state_dict(new_state_dict, strict=moso_model_opt['load_strict'])
+        # logger.info("Successfully load state {} with step {}.".format(moso_model_opt['checkpoint_path'], start_step))
 
         unet_path = './config/small_unet.yaml'
         unet_config = OmegaConf.load(unet_path).unet_config
@@ -185,23 +186,13 @@ def validate_fvd():
         unet_config.ds_id = moso_model_opt['ds_identity']
         unet_config.ds_mo = moso_model_opt['ds_motion']
         unet_config.vae_hidden = moso_model_opt['num_hiddens']
-
+        unet_config.model_channels = 32
         logger.debug(unet_config)
         unet = UNetModel(**unet_config).to(device)
 
     diffusion_wrapper = DiffusionWrapper(model=unet, conditioning_key=None).to(device)
     ddpm_wrapper_state = torch.load('chkpt/ddpm/ddpm_wrapper_model.pt', map_location='cpu')
     diffusion_wrapper.load_state_dict(ddpm_wrapper_state, strict=False)
-
-    ddpm_criterion = DDPM(diffusion_wrapper,
-                          channels=unet_config.in_channels,
-                          image_size=unet_config.image_size,
-                          linear_start=linear_start,
-                          linear_end=linear_end,
-                          log_every_t=log_every_t,
-                          w=w,
-                          ).to(device)
-
 
     unet.eval()
     diffusion_wrapper.eval()
@@ -219,6 +210,7 @@ def validate_fvd():
     # torch.save(ema_model.state_dict(), f'chkpt/ddpm/ema_{epoch}_{it}.pt')
     # assert False, "a new test_fvd_ddpm that uses new first_stage_model decoder"
 
+    # path = './data2'
     path = '/export2/xu1201/MOSO/merged_Token/UCF101/img256_16frames/valid'
 
     valid_loader = get_dataloader(data_folder_path=path, batch_size=batch_size, device=device)
