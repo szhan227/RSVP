@@ -268,8 +268,6 @@ def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None, num_loop=1):
     losses['fvd'] = AverageMeter()
     check = time.time()
 
-    # cond_model = ema_model.diffusion_model.cond_model
-
     diffusion_model = DDPM(ema_model,
                            channels=ema_model.diffusion_model.in_channels,
                            image_size=ema_model.diffusion_model.image_size,
@@ -277,18 +275,12 @@ def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None, num_loop=1):
                            # parameterization='x0',
                            w=0.).to(device)
     real_embeddings = []
-    fake_embeddings = []
     pred_embeddings = []
-
-    # reals = []
-    # fakes = []
-    # predictions = []
 
     i3d = load_i3d_pretrained(device)
     xbgs = []
     xids = []
     reals = []
-    contexts = []
     preds = []
     xmos = []
 
@@ -315,7 +307,6 @@ def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None, num_loop=1):
             xbg_tokens, xid_tokens, xmo_tokens = x_toks
 
             B = xmo_tokens.shape[0]
-            T = xmo_tokens.shape[1]
 
             xbg_quantized, xid_quantized, xmo_quantized = vqvae.get_quantized_by_tokens_with_rearrange(
                                                                                                  xbg_tokens,
@@ -334,22 +325,11 @@ def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None, num_loop=1):
             cids.append(cid_quantized)
             cmos.append(cmo_quantized)
 
-        concat_dim = -1
         for i in range(min(num_loop, len(cbgs))):
-
-            # ds_bg = diffusion_model.model.diffusion_model.ds_bg
-            # ds_id = diffusion_model.model.diffusion_model.ds_id
-            # ds_mo = diffusion_model.model.diffusion_model.ds_mo
-            # hidden_size = diffusion_model.model.diffusion_model.vae_hidden
-            # n_frames = T
 
             cbg, cid, cmo = cbgs[i], cids[i], cmos[i]
             xbg, xid, xmo = xbgs[i], xids[i], xmos[i]
             z = diffusion_model.sample_moso(batch_size=B, cond=(cbg, cid, cmo))
-
-            # logger.info('here show the shape of sampleing z:', z.shape)
-            # x_rec, _, _ = vqvae._decoder(bgs[i], ids[i], gts[i].permute(0, 2, 1, 3, 4))
-            # x_rec_fake, _, _ = vqvae._decoder(bgs[i], ids[i], z.permute(0, 2, 1, 3, 4))
 
             cbg = rearrange(cbg, 'b c t h w -> b t c h w')
             cid = rearrange(cid, 'b c t h w -> b t c h w')
@@ -366,25 +346,19 @@ def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None, num_loop=1):
             pred_rec, _, _ = vqvae._decoder(pred_bg_quantized, pred_id_quantized, pred_mo_quantized)
             real_rec, _, _ = vqvae._decoder(true_bg_quantized, true_id_quantized, true_mo_quantized)
 
-            # print(x_rec.shape, x_rec_fake.shape)
-            pred_rec = get_visualize_img(pred_rec)  # b
+            pred_rec = get_visualize_img(pred_rec)
             real_rec = get_visualize_img(real_rec)
-            # AssertionError: [(4, 16, 256, 256, 3), (4, 16, 256, 256, 3)]
-            # assert False, [x_rec.shape, x_rec_fake.shape]
+
             real_embeddings.append(get_fvd_logits(real_rec, i3d=i3d, device=device))
             pred_embeddings.append(get_fvd_logits(pred_rec, i3d=i3d, device=device))
 
             reals.append(real_rec)
             preds.append(pred_rec)
 
-    # need to translate N T H W C ->  N, C, T, H, W
-    # reals = np.transpose(np.concatenate(reals), (0, 4, 1, 2, 3))
-    # preds = np.transpose(np.concatenate(preds), (0, 4, 1, 2, 3))
     reals = np.array(reals)
 
     real_embeddings = torch.cat(real_embeddings)
     pred_embeddings = torch.cat(pred_embeddings)
-
 
     if rank == 0:
         real_vid = save_image_grid(reals, os.path.join(logger.logdir, f'real_{it}.gif'), drange=[0, 255],
@@ -394,10 +368,6 @@ def test_fvd_moso(rank, ema_model, vqvae, loader, it, logger=None, num_loop=1):
         pred_vid = save_image_grid(preds, os.path.join(logger.logdir, f'generated_{it}.gif'), drange=[0, 255],
                                    grid_size=(4, 4))
         pred_vid = np.expand_dims(pred_vid, 0).transpose(0, 1, 4, 2, 3)
-
-        # logger.video_summary('real', real_vid, it)
-        # logger.video_summary('prediction', pred_vid, it)
-
 
     fvd = frechet_distance(pred_embeddings.clone().detach(), real_embeddings.clone().detach())
     return fvd.item()

@@ -161,23 +161,24 @@ def validate_fvd():
     logger.debug('show vqvae config:', moso_model_opt)
     frozen_vqvae = VQVAEModel(moso_model_opt, moso_opt).to(device)
     if moso_model_opt['checkpoint_path'] is not None:
-        # state = torch.load(moso_model_opt['checkpoint_path'], map_location='cpu')
-        # start_step = state['steps']
-        #
-        # from collections import OrderedDict
-        # new_state_dict = OrderedDict()
-        # for k, v in state['state'].items():
-        #     if 'total_ops' in k or 'total_params' in k:
-        #         continue
-        #     if 'perceptual_loss' in k or '_discriminator' in k:
-        #         # if 'perceptual_loss' in k:
-        #         continue
-        #     if k[:7] == 'module.':
-        #         new_state_dict[k[7:]] = v
-        #
-        # # model.load_state_dict(new_state_dict, strict=False)
-        # frozen_vqvae.load_state_dict(new_state_dict, strict=moso_model_opt['load_strict'])
-        # logger.info("Successfully load state {} with step {}.".format(moso_model_opt['checkpoint_path'], start_step))
+
+        state = torch.load(moso_model_opt['checkpoint_path'], map_location='cpu')
+        start_step = state['steps']
+
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state['state'].items():
+            if 'total_ops' in k or 'total_params' in k:
+                continue
+            if 'perceptual_loss' in k or '_discriminator' in k:
+                # if 'perceptual_loss' in k:
+                continue
+            if k[:7] == 'module.':
+                new_state_dict[k[7:]] = v
+
+        # model.load_state_dict(new_state_dict, strict=False)
+        frozen_vqvae.load_state_dict(new_state_dict, strict=moso_model_opt['load_strict'])
+        logger.info("Successfully load state {} with step {}.".format(moso_model_opt['checkpoint_path'], start_step))
 
         unet_path = './config/small_unet.yaml'
         unet_config = OmegaConf.load(unet_path).unet_config

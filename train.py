@@ -92,14 +92,11 @@ def train(frozen_vqvae,
     # intialize DDPM model from scratch
     if unet is None:
         unet_path = './config/small_unet.yaml'
-        ldm_path = './config/ldm_base.yaml'
         unet_config = OmegaConf.load(unet_path).unet_config
 
         # change model channels for local test to a small number
         if local_test:
             unet_config.model_channels = 32
-        # unet_config.cond_model = False
-        # unet_config = OmegaConf.load(ldm_path).model.params.unet_config
 
         unet_config.ds_bg = moso_model_opt['ds_background']
         unet_config.ds_id = moso_model_opt['ds_identity']
@@ -143,13 +140,10 @@ def train(frozen_vqvae,
     diffusion_wrapper.train()
 
     if unet.cond_model:
-        # train_dataset = CondTokenDataset(train_data_path, device=device)
-        # train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
         train_loader, valid_loader = get_train_valid_loader(train_data_path,
                                                             batch_size=batch_size,
                                                             device=device,
                                                             train_valid_split=1)
-        # train_loader, train_sampler, valid_loader, valid_sampler = get_dataloader(moso_opt)
         logger.info('Load conditional token dataset.')
     else:
         train_loader = UncondTokenLoader(train_data_path, batch_size=batch_size, device=device)
@@ -165,78 +159,32 @@ def train(frozen_vqvae,
             if local_test and it > 0:
                 break
             diffusion_wrapper.zero_grad()
-            if unet.cond_model:
 
-                c_toks, x_toks = inputs
-                cbg_toks, cid_toks, cmo_toks = c_toks
-                xbg_toks, xid_toks, xmo_toks = x_toks
+            c_toks, x_toks = inputs
+            cbg_toks, cid_toks, cmo_toks = c_toks
+            xbg_toks, xid_toks, xmo_toks = x_toks
 
-                logger.debug('xbg_toks', xbg_toks.shape)
-                logger.debug('xid_toks', xid_toks.shape)
-                logger.debug('xmo_toks', xmo_toks.shape)
+            logger.debug('xbg_toks', xbg_toks.shape)
+            logger.debug('xid_toks', xid_toks.shape)
+            logger.debug('xmo_toks', xmo_toks.shape)
 
-                B, T, _, _ = cmo_toks.shape
+            B, T, _, _ = cmo_toks.shape
 
-                with torch.no_grad():
-                    cbg_quantized, cid_quantized, cmo_quantized = frozen_vqvae.get_quantized_by_tokens_with_rearrange(
-                        cbg_toks, cid_toks, cmo_toks)
-                    xbg_quantized, xid_quantized, xmo_quantized = frozen_vqvae.get_quantized_by_tokens_with_rearrange(
-                        xbg_toks, xid_toks, xmo_toks)
+            with torch.no_grad():
+                cbg_quantized, cid_quantized, cmo_quantized = frozen_vqvae.get_quantized_by_tokens_with_rearrange(
+                    cbg_toks, cid_toks, cmo_toks)
+                xbg_quantized, xid_quantized, xmo_quantized = frozen_vqvae.get_quantized_by_tokens_with_rearrange(
+                    xbg_toks, xid_toks, xmo_toks)
 
-                logger.debug('right before calling denoising module')
-                logger.debug('bg_quantized', xbg_quantized.shape)
-                logger.debug('id_quantized', xid_quantized.shape)
-                logger.debug('mo_quantized', xmo_quantized.shape)
+            logger.debug('right before calling denoising module')
+            logger.debug('bg_quantized', xbg_quantized.shape)
+            logger.debug('id_quantized', xid_quantized.shape)
+            logger.debug('mo_quantized', xmo_quantized.shape)
 
-                # zc = torch.cat([cbg_quantized, cid_quantized, cmo_quantized], dim=-1)
-                # zx = torch.cat([xbg_quantized, xid_quantized, xmo_quantized], dim=-1)
-                zc = cbg_quantized.float(), cid_quantized.float(), cmo_quantized.float()
-                zx = xbg_quantized.float(), xid_quantized.float(), xmo_quantized.float()
+            zc = cbg_quantized.float(), cid_quantized.float(), cmo_quantized.float()
+            zx = xbg_quantized.float(), xid_quantized.float(), xmo_quantized.float()
 
-                # (loss, t, output), loss_dict = ddpm_criterion(zx.float(), zc.float())
-                (loss, t, output), loss_dict = ddpm_criterion(zx, zc)
-
-            else:
-                bg_tokens, id_tokens, mo_tokens = inputs
-                bg_tokens = bg_tokens.to(device)
-                id_tokens = id_tokens.to(device)
-                mo_tokens = mo_tokens.to(device)
-                B, T, _, _ = mo_tokens.shape
-
-                # shape: (B, T, C, H, W)
-                bg_quantized, id_quantized, mo_quantized = frozen_vqvae.get_quantized_by_tokens(bg_tokens, id_tokens, mo_tokens)
-
-                logger.debug('bg_quantized', bg_quantized.shape)
-                logger.debug('id_quantized', id_quantized.shape)
-                logger.debug('mo_quantized', mo_quantized.shape)
-
-                # cbg_quantized, xbg_quantized = torch.clone(bg_quantized), torch.clone(bg_quantized)
-                # cid_quantized, xid_quantized = torch.clone(id_quantized), torch.clone(id_quantized)
-                # cmo_quantized, xmo_quantized = torch.chunk(mo_quantized, 2, dim=1)
-
-                bg_quantized = rearrange(bg_quantized, 'b t c h w -> b c (t h w)')
-                id_quantized = rearrange(id_quantized, 'b t c h w -> b c (t h w)')
-                mo_quantized = rearrange(mo_quantized, 'b t c h w -> b c (t h w)')
-
-                # cbg_quantized = rearrange(cbg_quantized, 'b t c h w -> b c (t h w)')
-                # cid_quantized = rearrange(cid_quantized, 'b t c h w -> b c (t h w)')
-                # cmo_quantized = rearrange(cmo_quantized, 'b t c h w -> b c (t h w)')
-                # xbg_quantized = rearrange(xbg_quantized, 'b t c h w -> b c (t h w)')
-                # xid_quantized = rearrange(xid_quantized, 'b t c h w -> b c (t h w)')
-                # xmo_quantized = rearrange(xmo_quantized, 'b t c h w -> b c (t h w)')
-
-                logger.debug('after rearrange quantized')
-                logger.debug('xbg_quantized', bg_quantized.shape)
-                logger.debug('xid_quantized', id_quantized.shape)
-                logger.debug('xmo_quantized', mo_quantized.shape)
-
-                zx = torch.concat([bg_quantized, id_quantized, mo_quantized], dim=-1)
-                # c = torch.concat([cbg_quantized, cid_quantized, cmo_quantized], dim=-1)
-
-                logger.debug('show zx shape', zx.shape)
-
-                # Unconditional Training
-                (loss, t, output), loss_dict = ddpm_criterion(zx.float())
+            (loss, t, output), loss_dict = ddpm_criterion(zx, zc)
 
             loss.backward()
             optimizer.step()
@@ -249,9 +197,6 @@ def train(frozen_vqvae,
                 # psnr = test_psnr(rank, model, test_loader, it, logger)
                 if logger is not None and rank == 0:
                     logger.scalar_summary('train/diffusion_loss', losses['diffusion_loss'].average, it)
-
-                    # logger.log('[Time %.3f] [Diffusion %f]' %
-                    #      (time.time() - check, losses['diffusion_loss'].average))
 
                 losses = dict()
                 losses['diffusion_loss'] = AverageMeter()
@@ -298,7 +243,7 @@ if __name__ == '__main__':
     # # change message level of the logger.
     logger.set_level(args.msg_level)
     if args.local_test:
-        logger.set_level('debug')
+        logger.set_level('info')
 
     # TODO: load your pretrained vqvae model here. Unet = None means to train DDPM from scratch.
     frozen_vqvae = None
