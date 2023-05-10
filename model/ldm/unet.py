@@ -946,8 +946,6 @@ class UNetModel(nn.Module):
         bg_sz = h_bg.size(3)
         id_sz = h_id.size(3)
         mo_sz = h_mo.size(3)
-        batch_sz = h_bg.size(0)
-        model_channels = h_bg.size(1)
 
         h_bg = rearrange(h_bg, 'b c t h w -> b c (t h w)')
         h_id = rearrange(h_id, 'b c t h w -> b c (t h w)')
