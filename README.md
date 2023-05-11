@@ -88,10 +88,13 @@ In order to train RSVP-M, run the following script:
     <img src="./README_images/RSVP-S.png"> 
 </p>
 
+In order to train RSVP-S, run the following scripts:
 
 ```bash
  python train.py --epochs [NUM_EPOCHS] --batch_size [BATCH_SIZE] --save_n [SAVE_CKPT_FREQ]
 ```
+
+For more information about RSVP-S, please see details in `siyang` branch.
 
 ### Evaluation
 We evaluate our model on FVD and PSNR metrics.
@@ -99,9 +102,8 @@ We evaluate our model on FVD and PSNR metrics.
 <p align="center">
     <img src="./README_images/Quali.png"> 
 </p>
-
-
 ### Citation
+
 ```bibtex
 @inproceedings{rsvp,
   title={RSVP: Revealing Semantics for Latent Diffusion based Video Prediction},
@@ -111,5 +113,4 @@ We evaluate our model on FVD and PSNR metrics.
 ```
 
 ### Reference
-This code is mainly built upon [MOSO](https://github.com/iva-mzsun/MOSO/tree/main) and [PVDM](https://github.com/sihyun-yu/PVDM)
-
+This code is mainly built upon [MOSO](https://github.com/iva-mzsun/MOSO/tree/main) and [PVDM](https://github.com/sihyun-yu/PVDM).
