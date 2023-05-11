@@ -87,7 +87,7 @@ In order to train RSVP-M, run the following script:
 <p align="center">
     <img src="./README_images/RSVP-S.png"> 
 </p>
-For more information about RSVP-S, please see details in  `siyang` branch.
+For more information about RSVP-S, please see details in `siyang` branch.
 
 In order to train RSVP-S, please checkout to `siyang` branch, and then run the following scripts:
 
