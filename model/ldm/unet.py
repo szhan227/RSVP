@@ -515,10 +515,10 @@ class UNetModel(nn.Module):
         out_channels,
         num_res_blocks,
         attention_resolutions,
-        ds_bg,
-        ds_id,
-        ds_mo,
-        vae_hidden,
+        ds_bg=5,
+        ds_id=4,
+        ds_mo=3,
+        vae_hidden=256,
         dropout=0,
         channel_mult=(1, 2, 4, 8),
         conv_resample=True,
@@ -1009,15 +1009,16 @@ if __name__ == '__main__':
 
     unet_path = '../../config/small_unet.yaml'
     unet_config = OmegaConf.load(unet_path).unet_config
-    print(unet_config)
-    logger.debug('cuda: ', torch.torch.cuda.device_count())
-    num_frames = 5
+    # print(unet_config)
+    # logger.debug('cuda: ', torch.torch.cuda.device_count())
+    # num_frames = 5
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    logger.debug('in this project, use device: ', device)
-    video_x = torch.randn(num_frames, 4, 2048).to(device)
-    timesteps = torch.tensor([0, 1, 2, 3, 4]).to(device)
+    # logger.debug('in this project, use device: ', device)
+    # video_x = torch.randn(num_frames, 4, 2048).to(device)
+    # timesteps = torch.tensor([0, 1, 2, 3, 4]).to(device)
     unet = UNetModel(**unet_config).to(device)
-    output = unet(video_x, timesteps=timesteps)
-    logger.debug('show output shape: ', output.shape)
+    # output = unet(video_x, timesteps=timesteps)
+    # logger.debug('show output shape: ', output.shape)
+    print(unet)
     
 
