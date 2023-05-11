@@ -87,14 +87,13 @@ In order to train RSVP-M, run the following script:
 <p align="center">
     <img src="./README_images/RSVP-S.png"> 
 </p>
+For more information about RSVP-S, please see details in  `siyang` branch.
 
-In order to train RSVP-S, run the following scripts:
+In order to train RSVP-S, please checkout to `siyang` branch, and then run the following scripts:
 
 ```bash
  python train.py --epochs [NUM_EPOCHS] --batch_size [BATCH_SIZE] --save_n [SAVE_CKPT_FREQ]
 ```
-
-For more information about RSVP-S, please see details in `siyang` branch.
 
 ### Evaluation
 We evaluate our model on FVD and PSNR metrics.
