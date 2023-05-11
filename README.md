@@ -102,6 +102,8 @@ We evaluate our model on FVD and PSNR metrics.
 <p align="center">
     <img src="./README_images/Quali.png"> 
 </p>
+
+
 ### Citation
 
 ```bibtex
