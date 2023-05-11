@@ -10,8 +10,9 @@ Pinyuan Feng.
 Brown University
 
 <p align="center">
-    <img src="./README_images/teaser.png"> 
+    <img src="./README_images/teaser.jpg"> 
 </p>
+
 
 
 ### Abstract
@@ -69,8 +70,9 @@ extract_tokens.py --opt [CONFIG_FILE_DIRECTORY] \
 #### Latent Diffusion model
 
 <p align="center">
-    <img src="./README_images/RSVP-M.png"> 
+    <img src="./README_images/RSVP-M.jpg"> 
 </p>
+
 
 In order to train RSVP-M, run the following script:
 
@@ -85,8 +87,9 @@ In order to train RSVP-M, run the following script:
 ```
 
 <p align="center">
-    <img src="./README_images/RSVP-S.png"> 
+    <img src="./README_images/RSVP-S.jpg"> 
 </p>
+
 For more information about RSVP-S, please see details in `siyang` branch.
 
 In order to train RSVP-S, please checkout to `siyang` branch, and then run the following scripts:
@@ -99,8 +102,9 @@ In order to train RSVP-S, please checkout to `siyang` branch, and then run the f
 We evaluate our model on FVD and PSNR metrics.
 
 <p align="center">
-    <img src="./README_images/Quali.png"> 
+    <img src="./README_images/Quali.jpg"> 
 </p>
+
 
 
 ### Citation
